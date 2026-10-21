@@ -17,6 +17,12 @@ CREATE TABLE IF NOT EXISTS sessions (
  token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id),
  expires_at timestamptz NOT NULL
 );
+CREATE TABLE IF NOT EXISTS adopter_profiles (
+ user_id text PRIMARY KEY REFERENCES users(id),registration_key text UNIQUE NOT NULL,
+ nickname text NOT NULL,real_name text NOT NULL,phone text NOT NULL,wechat text NOT NULL DEFAULT '',email text NOT NULL DEFAULT '',
+ lifestyle jsonb NOT NULL,verification text NOT NULL DEFAULT 'pending' CHECK(verification IN ('pending','verified','rejected')),
+ covenant_version text NOT NULL,accepted_at timestamptz NOT NULL DEFAULT now(),proactive_enabled boolean NOT NULL DEFAULT true
+);
 CREATE TABLE IF NOT EXISTS pets (
  id text PRIMARY KEY, station_id text NOT NULL REFERENCES stations(id), name text NOT NULL,
  profile jsonb NOT NULL DEFAULT '{}', published boolean NOT NULL DEFAULT false,
@@ -26,6 +32,10 @@ CREATE TABLE IF NOT EXISTS media (
  id text PRIMARY KEY, pet_id text NOT NULL REFERENCES pets(id), owner_id text NOT NULL REFERENCES users(id),
  object_name text UNIQUE NOT NULL, mime text NOT NULL, size integer NOT NULL,
  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS pet_agents (
+ pet_id text PRIMARY KEY REFERENCES pets(id),voice jsonb NOT NULL,
+ revision integer NOT NULL DEFAULT 1,updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS observations (
  id text PRIMARY KEY, pet_id text NOT NULL REFERENCES pets(id), author_id text NOT NULL REFERENCES users(id),
@@ -57,3 +67,11 @@ CREATE TABLE IF NOT EXISTS audit_events (
  id text PRIMARY KEY, actor_id text, action text NOT NULL, target_id text NOT NULL,
  created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS adoption_applications (
+ id text PRIMARY KEY,pet_id text NOT NULL REFERENCES pets(id),adopter_id text NOT NULL REFERENCES users(id),
+ station_id text NOT NULL REFERENCES stations(id),snapshot jsonb NOT NULL,note text NOT NULL,
+ stage integer NOT NULL DEFAULT 0 CHECK(stage BETWEEN -1 AND 3),version integer NOT NULL DEFAULT 1,
+ idempotency_key text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(adopter_id,idempotency_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS adoption_active ON adoption_applications(pet_id,adopter_id) WHERE stage>=0;

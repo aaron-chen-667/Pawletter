@@ -1,4 +1,5 @@
 import { knowledgeReply } from './pet-knowledge.js';
+import {petJourneyMessage} from './pet-voice.js';
 export const STORAGE_KEY = 'pawletter.demo.v1';
 export const stages = ['待审核', '待见面', '待交接', '已完成'];
 export const seedPets = [
@@ -97,7 +98,7 @@ export function replyFor(pet,text) {
   if (/疫苗|健康|绝育|生病/.test(text)) return `${pet.health}。我不会把未知的情况当成事实；具体记录需要救助者确认。`;
   if (/性格|亲人|慢热|安静/.test(text)) return `${pet.intro} 救助者记录的特点是「${pet.character}」。每个新环境都需要重新适应，我们可以慢慢来。`;
   if (/狗|孩子|小孩|幼儿/.test(text)) return `关于相处情况：${pet.unknown}。这个问题需要救助者进一步确认，不能只凭我的聊天口吻判断哦。`;
-  if (/领养|见面|接.*回家/.test(text)) return `很开心你愿意认真了解${pet.name}。可以点下方「我想领养」，确认生活条件后交给救助站审核，再安排见面。`;
+  if (/领养|见面|接.*回家/.test(text)) return `${/慢热|胆小/.test(pet.character)?'你愿意慢慢认识我，我有一点点开心。':/活泼/.test(pet.character)?'你也开始期待我们一起生活了吗？':'原来你也在认真想我们的以后呀。'} 可以点「我想领养」，先准备你的照护资料。之后还要和照顾我的人一起确认申请、见面与交接。`;
   if (/不喜欢|不考虑|不适合/.test(text)) return '谢谢你直接告诉我。适合彼此才最重要，我会尊重你的选择，也会把你明确表达的偏好记下来。';
   if (/喜欢|第一次|白天|上班/.test(text)) return `我记下你明确提到的偏好和生活条件了，可以在「我的记忆」里修改。关于${pet.name}，还需要一起了解：${pet.needs}。`;
   return `收到啦。这是场景式 Demo，目前我能介绍${pet.name}的性格、已有健康记录和领养流程。你也可以试试下面的话题；没有记录的事实，我会请救助者确认。`;
@@ -126,9 +127,10 @@ export function advanceApplication(state,id) {
     pet.status='adopted';
     pet.adoptionDay=1;
     state.applications.filter(a=>a.petId===pet.id && a.id!==id && a.stage>=0 && a.stage<3).forEach(a=>a.stage=-1);
-    addMessage(state,pet.id,'pet','交接已完成，欢迎开启共同生活。以后也可以在这里记录适应情况，救助者会看到你主动提交的回访。',{system:true});
+    addMessage(state,pet.id,'pet',petJourneyMessage(pet,'adopted'),{system:true});
     state.day=1;
   }
+  if(application.stage===1||application.stage===2)addMessage(state,pet.id,'pet',petJourneyMessage(pet,application.stage===1?'meeting':'handover'),{system:true});
   return true;
 }
 export function summarizeFeedback(text) {

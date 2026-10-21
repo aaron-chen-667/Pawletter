@@ -14,7 +14,7 @@ export function distanceKm(a,b) {
   const h=Math.sin(dLat/2)**2+Math.cos(rad(a.latitude))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
   return 6371*2*Math.atan2(Math.sqrt(h),Math.sqrt(Math.max(0,1-h)));
 }
-export function stationFor(pet) {return stations.find(s=>s.id===pet.stationId)||stations.find(s=>s.name===pet.station)||stations[0];}
+export function stationFor(pet) {if(pet?.stationRecord)return pet.stationRecord;return stations.find(s=>s.id===pet.stationId)||stations.find(s=>s.name===pet.station)||stations[0];}
 export function nearbyStations(location,radius) {
   return stations.map(station=>({...station,distance:distanceKm(location,station)})).filter(s=>s.distance<=radius).sort((a,b)=>a.distance-b.distance);
 }

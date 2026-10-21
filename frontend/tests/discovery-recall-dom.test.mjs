@@ -1,3 +1,4 @@
+import {catalogFixture} from './cloud-fixture.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
@@ -9,9 +10,9 @@ test('saved pets use recall cards; only completed adoptions belonging to this us
  const state=freshState(),[one,two,three]=state.pets;state.defaultExamplesRevision=1;state.account={id:'me',nickname:'用户'};
  state.following=[one.id,two.id];one.status='adopted';state.passed=[one.id,two.id];
  state.applications=[{petId:one.id,adopterId:'me',stage:3},{petId:two.id,adopterId:'someone-else',stage:3},{petId:three.id,adopterId:'me',stage:2}];
- localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+ sessionStorage.setItem('pawletter.user.me',JSON.stringify(state));sessionStorage.setItem('pawletter.auth.v1',JSON.stringify({token:'fixture',expiresAt:Date.now()+60000}));catalogFixture[0].profile.adopted=true;globalThis.fetch=async url=>({ok:true,json:async()=>url.endsWith('/catalog')?{pets:catalogFixture}:url.endsWith('/applications')?{applications:state.applications}:url.endsWith('/chat')?{messages:[]}:{id:'me',nickname:'用户',consent:false}});
  try{
-  await import('../dist/app.js');
+  await import('../dist/app.js');await new Promise(r=>setTimeout(r,30));
   assert.equal(document.querySelector('.discovery-meta'),null);
   assert.match(document.querySelector('.station-origin').textContent,/照顾我的救助站/);
   assert.deepEqual([...document.querySelectorAll('.discovery-tabs button')].map(b=>b.dataset.value),['nearby','swipe','saved']);

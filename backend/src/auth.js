@@ -32,8 +32,11 @@ export async function authenticate(db, request) {
 export async function login(db, username, password) {
   const { rows } = await db.query('SELECT * FROM users WHERE username=$1', [username]);
   assert(await verifyPassword(password, rows[0]?.password_hash) && rows[0]?.active, 401, 'INVALID_CREDENTIALS');
+  return issueSession(db,rows[0]);
+}
+export async function issueSession(db,user) {
   const token = randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 8 * 3600_000);
-  await db.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [digest(token), rows[0].id, expiresAt]);
-  return { token, expiresAt, user: { id: rows[0].id, role: rows[0].role, stationId: rows[0].station_id } };
+  await db.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [digest(token), user.id, expiresAt]);
+  return { token, expiresAt, user: { id:user.id,role:user.role,stationId:user.station_id } };
 }

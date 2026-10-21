@@ -1,0 +1,90 @@
+/* Shared action hierarchy: primary task, supporting action, quiet navigation. */
+:root{--action:#d5ff62;--action-ink:#191b24;--support:#eff0ff;--support-ink:#424bc4;--danger:#a92c4d;--muted:#65718a}
+.profile-like{position:absolute;right:18px;bottom:34px;z-index:2;width:44px;height:44px;border:1px solid #ffffff99;box-shadow:0 3px 12px #17213c1a}
+.profile-like.saved{color:#b83966;background:#fff0f6}.profile-like.saved .icon{fill:#f283aa;stroke:#b83966}.profile-photo .profile-label{right:78px}
+.share-link{width:100%;padding:14px;border:1px solid #dce2ee;border-radius:14px;background:#f6f8fc;color:#46546f;font-size:14px}
+.button{min-height:48px;padding:12px 18px;border-radius:16px;font-size:14px;font-weight:700;line-height:1.5;transition:background .15s,box-shadow .15s}
+.button.primary{background:var(--action);color:var(--action-ink);border:1px solid transparent;box-shadow:none}
+.button.primary:hover{background:#c8f34f}
+.button.secondary{background:#fff;color:#46546f;border:1px solid #dce2ee;box-shadow:none}
+.button.secondary:hover{background:#f0f3fa;border-color:#bac5d9}
+.button:disabled,.small-button:disabled{background:#e9edf3;color:#7b8497;border-color:transparent;opacity:1;box-shadow:none}
+.text-button{min-height:44px;padding:10px 8px;color:#4e5d7a;font-size:13px;line-height:1.6;border-radius:10px}
+.text-button:hover{background:#edf0f8}
+.icon-button,.brand-header .icon-button{min-width:44px;min-height:44px}
+.small-button{min-width:48px;min-height:40px;border-radius:12px;background:var(--support);color:var(--support-ink);font-size:12px;font-weight:700}
+.small-button.active,.consent-card .small-button{background:var(--support);color:var(--support-ink)}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #5660f5;outline-offset:3px}
+:is(button,a)[data-action=delete-memory],:is(button,a)[data-action=withdraw],:is(button,a)[data-action=reject],:is(button,a)[data-action=observation-undo],button[data-live=withdraw]{color:var(--danger);background:#fff5f7;border:1px solid #f1ccd7}
+[data-action=confirm-logout].primary,[data-action=confirm-reset].primary{background:#a92c4d;color:#fff}
+.personal-logout{min-height:44px;font-size:12px;color:#68748a;border-radius:10px;padding:8px 12px;top:0}
+.personal-logout:hover{background:#e9edf6;color:#37445d}
+.personal-card.has-pets{display:flex;flex-direction:column;text-align:center;gap:22px;padding-top:18px}
+.personal-card.has-pets .family-avatar-row{width:100%;justify-content:center;align-items:center;flex-wrap:wrap}
+.personal-card.has-pets .personal-copy{width:100%;text-align:center}
+.account-footer{margin-top:32px;padding-top:18px;border-top:1px solid #e5e9f2;text-align:center}
+.account-footer .text-button{color:#748096;min-width:140px;font-size:13px}
+.chat-citation{display:block;margin-top:10px;padding-top:8px;border-top:1px solid #e5e9f1;color:#78839a;font-size:11px;line-height:1.7}
+.chat-error{margin:0 16px 8px;font-size:12px;color:#a92c4d}.chat-loading{font-size:12px;color:#77839b;padding:10px 20px}
+.personal-card:has(.personal-logout){padding-top:50px}
+.menu-item{min-height:76px}.menu-item strong{font-size:15px}.menu-item small{font-size:12px;line-height:1.6;color:#748099}
+.menu-item:hover{background:#f6f8fc;border-radius:12px}.menu-icon{color:#6572c9}
+.form-stack{gap:22px}.form-stack label{font-size:14px;line-height:1.7}
+.form-stack input:not([type=checkbox]):not([type=radio]),.form-stack textarea,.form-stack select{font-size:16px;border-color:#dce2ee;line-height:1.6}
+.form-stack :is(input,textarea):focus{border-color:#7279e7}
+.checkbox-label{padding:4px 0;gap:12px}.checkbox-label input{min-width:20px;min-height:20px;accent-color:#505bd5}
+.form-error:empty{display:none}.form-error{color:#a92c4d;font-size:13px;line-height:1.7}
+.footnote{font-size:12px;line-height:1.8;color:#758099}
+.modal-sheet{border-radius:28px 28px 0 0}.modal-sheet .button{min-height:48px}.logout-actions{gap:12px}.modal-intro{font-size:14px;line-height:1.8}
+.phone-app .brand-header{padding-top:16px;padding-bottom:12px}.header-location{min-height:48px}.header-role{min-height:44px}
+/* The pet, not the decoration, owns the discovery viewport. */
+.discover .intro-heading,.discover:has(.swipe-card) .intro-heading,.discover:has(.swipe-actions) .intro-heading{display:block;padding:8px 46px 18px 0;min-height:76px}
+.discover .intro-heading .eyebrow,.discover:has(.swipe-card) .intro-heading .eyebrow{display:none}
+.discover .intro-heading h1,.discover:has(.swipe-card) .intro-heading h1{font-size:22px;line-height:1.4;letter-spacing:-.6px;margin:0}
+.discover .intro-heading h1 br,.discover:has(.swipe-card) .intro-heading h1 br{display:none}
+.discover .intro-heading>p:last-of-type{font-size:11px;line-height:1.6;margin-top:5px;color:#77849b}
+.discover .intro-paw,.discover:has(.swipe-card) .intro-paw{display:block;top:12px;right:4px;transform:rotate(12deg)}
+.discover .intro-paw .icon{width:32px;height:32px;filter:none}
+.discover .discovery-tabs,.discover:has(.swipe-actions) .discovery-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0;padding:4px;border-radius:17px;background:#e9edf5}
+.discovery-tabs button{min-height:44px;color:#66738c;font-size:13px;border-radius:13px}
+.discovery-tabs button.active{background:#191b24;color:white}
+.discover .filter-row,.discover:has(.swipe-actions) .filter-row{gap:8px;margin:18px 0 20px;align-items:center}
+.filter-chip{min-height:40px;min-width:52px;font-size:12px;padding:8px 14px;color:#62708a}
+.filter-chip.selected{background:#e9ecff;border-color:#cfd5ff;color:#414cc0}
+.discover:has(.swipe-actions) .hero-image-button,.story-mode .discover:has(.swipe-actions) .hero-image-button{height:clamp(140px,calc(var(--chat-height,100dvh) - 580px),420px)}
+.discover:has(.swipe-actions) .hero-content{padding:10px 14px}.discover:has(.swipe-actions) .pet-quote{font-size:13px;margin-bottom:4px}
+.discover:has(.swipe-actions) .swipe-actions{margin-top:16px;gap:20px}.swipe-actions button{min-width:44px;min-height:44px}
+.swipe-actions .swipe-no{width:50px;height:50px;background:#fff;color:#ab7083}.swipe-actions .swipe-yes{width:60px;height:60px;box-shadow:2px 3px 0 #191b24}
+.swipe-actions .swipe-chat{color:#535ec9;background:#f1f1ff}.swipe-actions .swipe-undo{color:#75849e}
+.discover:has(.swipe-actions) .swipe-caption{font-size:10px;margin-top:10px}.saved-pet-actions .button{min-height:44px;font-size:12px}
+.station-origin{min-height:44px}.sticky-actions{gap:12px}.sticky-actions .button{min-height:50px}
+.station-pet-actions .button,.tracking-actions .button,.animal-quick-actions .button{min-height:44px;font-size:12px}
+.rescue-shortcuts{gap:12px}.rescue-shortcuts .button{min-height:56px;font-size:14px}.rescue-shortcuts .secondary{background:#eef0ff;border:1px solid #d7dcff;color:#4855c4}
+.work-task{padding:20px}.work-task .button{min-height:46px;background:#f0f2ff;color:#454fc0;border-color:#dce0ff}.work-task.urgent .button{background:#191b24;color:#fff;border-color:#191b24}
+.task-tabs{gap:8px}.task-tabs button{min-height:42px;font-size:13px}.task-tabs .active{background:#191b24;color:#fff}
+/* One conversation surface, one main voice action. */
+.phone-app.interview-app{height:var(--chat-height,100dvh);min-height:0;display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+.interview-app .topbar{flex-shrink:0;border-bottom:1px solid #eceef5;padding:12px 16px}
+.interview-page{min-height:0;display:flex;flex:1;flex-direction:column}
+.interview-stream{flex:1;min-height:0;overflow:auto;padding:24px 20px 12px;overscroll-behavior:contain;display:flex;flex-direction:column;gap:16px}
+.interview-bubble{padding:16px 18px;border-radius:21px;font-size:15px;line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere;max-width:92%}
+.interview-bubble.agent{background:white;border:1px solid #e9ecf4;align-self:flex-start;border-top-left-radius:6px}
+.interview-bubble.human{background:#e6e2ff;color:#414764;align-self:flex-end;border-top-right-radius:6px}
+.interview-agent-mark{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#5360c7;margin-bottom:9px}.interview-agent-mark .icon{width:18px;height:18px}
+.interview-bubble small{font-size:12px;color:#7a8499;line-height:1.7;display:block;margin-top:9px}
+.interview-composer{flex-shrink:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e6eaf2}
+.interview-live{font-size:13px;line-height:1.65;min-height:28px;max-height:90px;overflow:auto;color:#687590;padding:3px 0 10px;overflow-wrap:anywhere}
+.interview-hold{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:54px;border-radius:17px;background:#191b24;color:#d5ff62;font-size:16px;font-weight:700;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.interview-hold.recording{background:#d5ff62;color:#191b24;box-shadow:0 0 0 4px #d5ff622b}.interview-hold.cancelling{background:#a92c4d;color:white}.interview-hold:disabled{background:#e9edf4;color:#7d879b;opacity:1}
+.interview-text{display:flex;gap:10px;margin-top:10px;align-items:end}.interview-text textarea{flex:1;min-width:0;border:1px solid #e1e6ef;border-radius:14px;background:#f7f8fc;min-height:44px;max-height:90px;padding:10px 13px;font-size:15px;line-height:1.5;resize:vertical;color:#35415d}
+.interview-text button{min-width:44px;min-height:44px;border-radius:14px;background:#eff1ff;color:#4855c4}.interview-composer .footnote{font-size:10px;margin-top:8px;text-align:center}.interview-composer audio{width:100%;height:36px}
+.persona-hero{background:#e9e4ff;padding:26px 24px;border-radius:26px}.persona-hero>span{display:grid;place-items:center;width:46px;height:46px;background:#d5ff62;border-radius:15px;margin-bottom:20px}.persona-hero>p:first-of-type{font-size:9px;letter-spacing:1.5px;font-weight:700;color:#7474a0}.persona-hero h1{font-size:27px;line-height:1.4;margin:8px 0 14px}.persona-hero>p:last-child{font-size:14px;line-height:1.9;color:#575e7d}
+.persona-highlights{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}.persona-highlights span{padding:7px 12px;border-radius:10px;background:#eef1f8;font-size:12px;color:#54617e}
+.persona-section{font-size:18px;margin:28px 0 14px}.persona-recommendation{background:#fff;padding:20px;border:1px solid #e3e7f0;border-radius:22px;margin:12px 0}.persona-recommendation h3{font-size:16px;margin-bottom:8px}.persona-recommendation p{font-size:14px;color:#56647f}.persona-recommendation small{display:block;margin-top:12px;font-size:11px;color:#7f89a0}.persona-details{margin:24px 0}.persona-details summary{min-height:44px;cursor:pointer;font-size:13px;color:#52607a;padding:10px 0}.persona-details .lifestyle-answer{margin:12px 0}
+.application-profile{padding:20px;background:#fff;border:1px solid #e1e6f1;border-radius:23px}.application-profile h3{font-size:18px}.application-profile p{font-size:14px;line-height:1.9;color:#5e6c87}.application-profile summary{min-height:44px;font-size:13px;color:#5260b9;padding:10px 0;cursor:pointer}.application-profile details p{margin:10px 0}.application-conversation .interview-bubble{max-width:100%;margin-bottom:14px}.application-conversation textarea{width:100%;margin-top:12px}
+.online-app .online-actions .button{min-height:48px}.online-app .online-actions [data-live=voice]{background:#eef0ff;color:#4855c4;border:1px solid #d7dcff}.online-app .online-pet{padding:18px;margin:12px 0}.online-app .online-pet:hover{border-color:#b5bfd8;box-shadow:0 4px 12px #3e49650a}.online-app .online-voice{width:150px;height:150px;margin:26px auto}.online-app .chat-compose .button{align-self:end}.online-app .topbar .text-button{font-size:12px}
+@media(max-width:374px){.discover .intro-heading h1,.discover:has(.swipe-card) .intro-heading h1{font-size:20px}.discover .intro-heading{padding-right:34px}.discovery-tabs button{font-size:12px;gap:4px}.interview-stream{padding:18px 16px}.interview-composer{padding-left:16px;padding-right:16px}.rescue-shortcuts .button{font-size:13px}}
+@media(max-height:700px){.discover .intro-heading,.discover:has(.swipe-actions) .intro-heading{padding-top:4px;padding-bottom:12px;min-height:52px}.discover .intro-heading>p:last-of-type{display:none}.discover .filter-row,.discover:has(.swipe-actions) .filter-row{margin-top:14px;margin-bottom:16px}.interview-composer .footnote{display:none}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+.online-app .work-shortcuts{margin:0 0 28px}.online-app img.pet-symbol{object-fit:cover}
+@media(max-height:700px){.discover:has(.swipe-actions) .hero-image-button{height:120px}.discover:has(.swipe-actions) .station-origin{min-height:40px;padding:6px 10px}.discover:has(.swipe-actions) .station-origin small{display:none}.discover:has(.swipe-actions) .swipe-actions{margin-top:12px}.discover:has(.swipe-actions) .hero-content{padding:8px 12px}.discover:has(.swipe-actions) .swipe-caption{display:none}}

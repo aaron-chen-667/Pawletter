@@ -10,7 +10,7 @@ test('online UI logs in with server role, records to correct pet, preserves corr
    const path=new URL(url).pathname,body=options.body?JSON.parse(options.body):undefined;calls.push({path,body,headers:options.headers});
    let data={};let status=200;
    if(path.endsWith('/login'))data={token:'memory-only-token',user:{id:'user',role,stationId:role==='station'?'station-1':null},expiresAt:'2099-01-01'};
-   else if(path==='/v1/pets')data={pets:[p]};
+   else if(path==='/v1/applications')data={applications:[]};else if(path==='/v1/pets')data={pets:[p]};
    else if(path.endsWith('/knowledge'))data={notes:rows.length?[{id:'note',quote:'今天不愿被抱。',topic:'likes',certainty:'observation',station:'本站',recorded_at:'2026-10-21'}]:[]};
    else if(path.endsWith('/observations')&&options.method==='POST'){rows=[{id:'obs',original_text:body.text,share_with_agent:body.shareWithAgent,status:'archived',created_at:'2026-10-21'}];data={id:'obs'};}
    else if(path.endsWith('/observations'))data={observations:rows};

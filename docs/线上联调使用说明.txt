@@ -2,9 +2,11 @@
 日期：2026-10-21
 
 入口：https://pawletter-adoption-h5.chenaaron668.chatgpt.site/?mode=online
-发布版本：H5 v7（2026-10-21 发布成功）
-Sites 源码提交：d227b0c7bb5f126cbb2e8139f388e8587ea46800
-原入口仍保留本地完整产品体验；“我的”和救助站工作台新增线上账号登录入口。
+发布版本：H5 v8（2026-10-21 发布成功）
+Sites 源码提交：cae6b6afe6f2abb663174c2445e529a37164f8ac
+普通浏览默认进入领养者界面。“我的”右上角选择身份；切换救助站后进入专用登录页：
+https://pawletter-adoption-h5.chenaaron668.chatgpt.site/?mode=online&role=station
+两块大登录横幅和直接预览救助站的按钮已移除。救助站入口会核对真实账号角色，领养者账号无法进入站点工作台。
 
 一、账号
 管理员已开通救助站、领养者两个独立测试账号。

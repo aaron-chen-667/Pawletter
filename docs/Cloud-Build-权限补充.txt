@@ -1,0 +1,40 @@
+爪爪来信：Cloud Build 权限补充
+检查时间：2026-10-21（北京时间）
+项目：pawletter-adoption（446222711695）
+区域：asia-east1
+
+已完成：
+- aaronchen667@gmail.com 已通过官方 Google Cloud CLI 登录。
+- 可以读取项目、Cloud Run、Cloud SQL、媒体桶、Artifact Registry 和密钥元数据。
+- Cloud Run 当前镜像为 Google hello 占位镜像，业务后端尚未部署。
+- PostgreSQL 17 实例 pawletter-db-test 为 RUNNABLE。
+- pawletter-media-test 为私有桶，已配置前端域名 CORS 和 30 天清理规则。
+- DATABASE_URL、AI_API_KEY、AI_BASE_URL 均有启用版本；未导出密钥内容。
+- 当前用户对 pawletter-run@pawletter-adoption.iam.gserviceaccount.com 的 iam.serviceAccounts.actAs 检查通过。
+
+需管理员补充：
+Cloud Build 返回的默认构建账号是：
+446222711695-compute@developer.gserviceaccount.com
+当前用户在该账号上的 iam.serviceAccounts.actAs 检查为 false。
+项目 IAM 策略中未发现该默认构建账号的项目级角色绑定，需核对并授予构建权限。
+
+如果继续使用当前默认构建账号，请项目管理员在 Google Cloud Shell 执行以下两条命令。
+这些命令会修改 IAM；本次仅准备交接命令，尚未执行。
+不要把角色赋给应用运行账号 pawletter-run 来替代构建账号。
+
+1. 允许开发账号使用这个构建账号（只在这个服务账号上授权）：
+
+gcloud iam service-accounts add-iam-policy-binding 446222711695-compute@developer.gserviceaccount.com --project=pawletter-adoption --member=user:aaronchen667@gmail.com --role=roles/iam.serviceAccountUser
+
+2. 给构建账号授予 Cloud Build 构建所需角色：
+
+gcloud projects add-iam-policy-binding pawletter-adoption --member=serviceAccount:446222711695-compute@developer.gserviceaccount.com --role=roles/cloudbuild.builds.builder
+
+如果团队采用自定义最小权限角色或专用构建账号，也可以沿用团队规范；请提供该构建账号邮箱，并确认开发账号可使用它、它可读取构建源码、写入构建日志并推送到 asia-east1-docker.pkg.dev/pawletter-adoption/pawletter。
+无需发送密码、API Key 或服务账号 JSON 私钥。
+
+完成后，继续执行构建和部署检查，进一步确认运行时数据库连接、AI 模型可用性及上传链路。此检查不代表业务后端已完成，也不代表应用运行时的密钥读取、数据库连接和 AI 请求已经实测成功。
+
+官方依据：
+https://docs.cloud.google.com/build/docs/cloud-build-service-account-updates
+https://docs.cloud.google.com/build/docs/securing-builds/configure-access-for-cloud-build-service-account

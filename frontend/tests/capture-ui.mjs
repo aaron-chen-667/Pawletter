@@ -1,0 +1,82 @@
+import {launchBrowser} from './browser.mjs';
+import assert from 'node:assert/strict';
+import {fileURLToPath} from 'node:url';
+const browser=await launchBrowser({args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']});
+const context=await browser.newContext({viewport:{width:390,height:844},permissions:['camera','microphone','geolocation'],geolocation:{latitude:30.274,longitude:120.155}});
+await context.addInitScript(()=>{
+  window.__mediaTracks=[];
+  const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  navigator.mediaDevices.getUserMedia=async constraints=>{
+    const stream=await original(constraints);window.__mediaTracks.push(...stream.getTracks());return stream;
+  };
+});
+const page=await context.newPage();page.setDefaultTimeout(10000);
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const action=(a,v)=>page.locator(`[data-action="${a}"]${v?`[data-value="${v}"]`:''}:visible`).last();
+const screenshot=async name=>page.screenshot({path:fileURLToPath(new URL('../.preview/'+name+'.png',import.meta.url)),fullPage:true,style:'#toast {visibility:hidden!important}'});
+try{
+  await page.goto('http://127.0.0.1:4178');
+  await action('location').click();await action('locate').click();
+  await page.waitForFunction(()=>JSON.parse(localStorage.getItem('pawletter.demo.v1'))?.location.source==='live');
+  await page.getByRole('button',{name:'关闭',exact:true}).click();
+  await action('discovery-mode','swipe').click();
+  const card=page.locator('#swipe-card'),box=await card.boundingBox();
+  await page.mouse.move(box.x+100,box.y+150);await page.mouse.down();await page.mouse.move(box.x+245,box.y+154,{steps:12});await page.mouse.up();
+  await page.waitForTimeout(400);
+  assert.ok((await page.evaluate(()=>JSON.parse(localStorage.getItem('pawletter.demo.v1')))).following.includes('orange'));
+  await action('demo').click();await action('role','rescue').click();await action('intake').click();
+  await page.waitForFunction(()=>document.querySelector('#camera-preview')?.videoWidth>0);
+  await action('shutter').click();
+  assert.equal(await page.locator('.capture-thumb img').count(),1);
+  await action('capture-mode','video').click();await action('shutter').click();
+  await page.waitForTimeout(650);await action('shutter').click();
+  await page.locator('.video-thumb').waitFor();
+  await screenshot('13-live-camera');
+  await action('to-voice').click();
+  assert.equal(await page.evaluate(()=>window.__mediaTracks.filter(t=>t.kind==='video'&&t.readyState==='live').length),0);
+  await action('record').click();await page.locator('.voice-mic.recording').waitFor();
+  await page.waitForTimeout(650);await action('record').click();
+  await page.locator('.audio-preview').waitFor();
+  assert.equal(await page.evaluate(()=>window.__mediaTracks.filter(t=>t.kind==='audio'&&t.readyState==='live').length),0);
+  await screenshot('14-recorded-voice');
+  await action('analyze-intake').click();await page.locator('#confirm-form').waitFor();
+  assert.match(await page.locator('.facts-card').innerText(),/待命名伙伴/);
+  assert.match(await page.locator('.facts-card').innerText(),/未自动识别/);
+  await page.waitForFunction(()=>document.querySelector('.checkin-media audio')?.readyState>=2);
+  const pet=await page.evaluate(()=>JSON.parse(localStorage.getItem('pawletter.demo.v1')).pets[0]);
+  assert.ok(pet.intakeMedia.find(m=>m.type==='audio')?.id);
+  assert.ok(pet.intakeMedia.find(m=>m.type==='video')?.id);
+  await page.reload();
+  await action('demo').click();await action('role','user').click();
+  await action('nav','mine').click();await action('register').click();
+  await page.locator('[name=covenant]').check();await page.locator('[name=privacy]').check();await page.locator('#register-form button[type=submit]').click();
+  await action('demo').click();await action('role','rescue').click();
+  await action('nav','animals').click();await action('confirm',pet.id).click();
+  await page.waitForFunction(()=>document.querySelector('.checkin-media audio')?.readyState>=2);
+  await page.waitForFunction(()=>document.querySelector('.checkin-media video')?.readyState>=2);
+  await screenshot('15-confirm-original-media');
+  // Open a permitted demo adoption, then verify voice-first follow-up and its persistence.
+  await page.evaluate(()=>{
+    const s=JSON.parse(localStorage.getItem('pawletter.demo.v1'));s.role='user';s.pets.find(p=>p.id==='orange').status='adopted';s.applications=[{id:'demo-a',petId:'orange',stage:3}];localStorage.setItem('pawletter.demo.v1',JSON.stringify(s));
+  });await page.reload();
+  await action('nav','mine').click();await action('progress').click();await action('followup','orange').click();
+  assert.equal(await page.locator('#feedback-form').count(),0);
+  await action('voice-checkin','orange').click();await action('record').click();await page.locator('.voice-mic.recording').waitFor();
+  await page.waitForTimeout(650);await action('record').click();await page.locator('.audio-preview').waitFor();
+  await action('analyze-intake').click();await action('submit-checkin').click();
+  await action('send-private').click();
+  await page.locator('.feedback-card').waitFor();
+  const result=await page.evaluate(()=>JSON.parse(localStorage.getItem('pawletter.demo.v1')).followups.at(-1));
+  assert.equal(result.attention,true);assert.ok(result.media.some(m=>m.type==='audio'&&m.id));
+  await page.reload();await action('nav','mine').click();await action('progress').click();await action('followup','orange').click();
+  await page.waitForFunction(()=>document.querySelector('.feedback-card audio')?.readyState>=2);
+  await screenshot('16-audio-checkin');
+  // Chat has one contextual action, settings elsewhere, and no old bottom tools.
+  await action('demo').click();await action('role','user').click();await action('nav','messages').click();
+  await action('consent','on').click();await action('chat').click();
+  assert.equal(await page.locator('.chat-tools').count(),0);
+  await action('chat-options').click();await action('mute').click();
+  assert.equal(await page.locator('.modal-sheet').count(),0);
+  assert.deepEqual(errors,[]);
+  console.log('PASS: geolocation, pointer swipes, live photo/video, microphone, track cleanup, original media persisted across reload, audio check-in, contextual chat settings.');
+}catch(error){await screenshot('capture-failure');throw error;}finally{await browser.close();}

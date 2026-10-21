@@ -1,0 +1,80 @@
+{
+  "note": "Unsplash stock photography used for fictional demo profiles. These are not photographs documenting the fictional rescue cases or follow-up dates.",
+  "photos": [
+    {
+      "file": "cat-01.jpg",
+      "source": "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "cat-02.jpg",
+      "source": "https://images.unsplash.com/photo-1533738363-b7f9aef128ce",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "cat-03.jpg",
+      "source": "https://images.unsplash.com/photo-1511044568932-338cba0ad803",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "cat-04.jpg",
+      "source": "https://images.unsplash.com/photo-1495360010541-f48722b34f7d",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "cat-05.jpg",
+      "source": "https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "cat-06.jpg",
+      "source": "https://images.unsplash.com/photo-1592194996308-7b43878e84a6",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "cat-07.jpg",
+      "source": "https://images.unsplash.com/photo-1574158622682-e40e69881006",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "cat-08.jpg",
+      "source": "https://images.unsplash.com/photo-1513245543132-31f507417b26",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "dog-01.jpg",
+      "source": "https://images.unsplash.com/photo-1558788353-f76d92427f16",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "dog-02.jpg",
+      "source": "https://images.unsplash.com/photo-1587300003388-59208cc962cb",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "dog-03.jpg",
+      "source": "https://images.unsplash.com/photo-1543466835-00a7907e9de1",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "dog-04.jpg",
+      "source": "https://images.unsplash.com/photo-1517849845537-4d257902454a",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "dog-05.jpg",
+      "source": "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "dog-06.jpg",
+      "source": "https://images.unsplash.com/photo-1583337130417-3346a1be7dee",
+      "transform": "proportional resize to max width 900; no stretching"
+    },
+    {
+      "file": "dog-07.jpg",
+      "source": "https://images.unsplash.com/photo-1537151625747-768eb6cf92b2",
+      "transform": "proportional resize to max width 900; no stretching"
+    }
+  ]
+}

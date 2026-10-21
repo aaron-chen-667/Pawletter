@@ -1,0 +1,10 @@
+{
+  "name": "pawletter",
+  "private": true,
+  "scripts": {
+    "check": "npm --prefix frontend run check && npm --prefix backend run check",
+    "test": "npm --prefix frontend test && npm --prefix backend test",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "start:backend": "npm --prefix backend start"
+  }
+}

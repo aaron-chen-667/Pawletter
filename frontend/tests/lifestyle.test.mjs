@@ -1,0 +1,48 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {freshState,recommendations} from '../dist/domain.js';
+import {lifestyleQuestions,confirmLifestyle,beginRegistration,completeRegistration} from '../dist/lifestyle.js';
+import {enrichCatalog,populateDefaultExamples} from '../dist/samples.js';
+import {initializeCommunity,publicProfile} from '../dist/community.js';
+import {initializeDiscovery} from '../dist/discovery.js';
+test('registration creates account and reserves identity only after profile confirmation',()=>{
+ const s=freshState();initializeCommunity(s);
+ const details={nickname:'新领养者',identity:'DEMO-0001',covenant:true,privacy:true};
+ assert.throws(()=>beginRegistration(s,{...details,covenant:false}));
+ beginRegistration(s,details);
+ assert.equal(s.account,null);assert.equal(s.identityRegistry['DEMO-0001'],undefined);
+ assert.throws(()=>completeRegistration(s));
+ assert.equal(s.account,null);assert.equal(s.identityRegistry['DEMO-0001'],undefined);
+ s.registrationDraft.lifestyleDraft=Object.fromEntries(lifestyleQuestions.map(q=>[q.key,{text:q.sample,value:q.value}]));
+ const restored=JSON.parse(JSON.stringify(s));
+ completeRegistration(restored);
+ assert.ok(restored.account.lifestyle.confirmedAt);
+ assert.equal(restored.identityRegistry['DEMO-0001'],restored.account.id);
+ assert.equal(restored.registrationDraft,undefined);
+ assert.throws(()=>beginRegistration(restored,details));
+});
+test('confirmed lifestyle affects ranking, remains private and can be removed',()=>{
+ const s=freshState();initializeDiscovery(s);initializeCommunity(s);enrichCatalog(s);s.account={id:'u',nickname:'用户'};
+ const answers=Object.fromEntries(lifestyleQuestions.map(q=>[q.key,{text:q.sample,value:q.value}]));
+ const original=recommendations(s).find(r=>r.pet.id==='tabby').score;
+ s.account.lifestyleDraft=answers;
+ assert.equal(recommendations(s).find(r=>r.pet.id==='tabby').score,original);
+ confirmLifestyle(s,answers);
+ assert.ok(recommendations(s).find(r=>r.pet.id==='tabby').score>original);
+ assert.doesNotMatch(JSON.stringify(publicProfile(s)),/朝九晚六|十一点|lifestyle/);
+ delete s.account.lifestyle;assert.equal(recommendations(s).find(r=>r.pet.id==='tabby').score,original);
+ assert.throws(()=>confirmLifestyle(s,{}));
+});
+test('default data is idempotent and respects existing applicants and pet states',()=>{
+ const s=freshState();initializeDiscovery(s);initializeCommunity(s);enrichCatalog(s);
+ populateDefaultExamples(s);
+ assert.equal(s.account.nickname,'阿远');assert.ok(s.followups.length>0);
+ assert.equal(publicProfile(s).applications.length,1);assert.equal(publicProfile(s).adoptions.length,1);
+ const json=JSON.stringify(s);populateDefaultExamples(s);assert.equal(JSON.stringify(s),json);
+ const existing=freshState();initializeDiscovery(existing);initializeCommunity(existing);enrichCatalog(existing);
+ existing.account={id:'mine',nickname:'原用户'};existing.pets[0].name='原名字';existing.applications.push({id:'own',petId:'orange',stage:1,adopterId:'mine'});
+ populateDefaultExamples(existing);
+ assert.equal(existing.account.id,'mine');assert.equal(existing.pets[0].name,'原名字');
+ assert.equal(existing.applications.filter(a=>a.petId==='orange').length,1);
+ assert.equal(existing.applications.find(a=>a.id==='own').stage,1);
+});

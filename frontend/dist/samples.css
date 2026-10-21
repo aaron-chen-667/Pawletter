@@ -1,0 +1,29 @@
+.story-entry{display:flex;align-items:center;gap:12px;text-align:left;width:100%;background:#e9e5fd;border:1px solid #ded9f5;border-radius:21px;padding:19px;margin:24px 0}
+.story-entry>span{display:grid;place-items:center;width:40px;height:40px;background:white;border-radius:13px;flex-shrink:0;color:#5660f5}
+.story-entry>div{flex:1}
+.story-entry strong{font-size:13px}.story-entry p{font-size:11px;line-height:1.7;color:#6f688e;margin-top:5px}
+.story-entry>.icon{width:18px;height:18px;color:#5660f5}
+.story-list{display:grid;gap:22px;margin-bottom:22px}
+.story-card{width:100%;padding:0;border-radius:24px;overflow:hidden;text-align:left;background:white;border:1px solid #dfe5f1}
+.story-card>img{width:100%;height:230px;object-fit:cover;display:block}
+.story-card>div{padding:20px}
+.story-card span{font-size:10px;color:#5660f5}
+.story-card h2{font-size:22px;line-height:1.5;margin:8px 0}
+.story-card p{font-size:12px;line-height:1.9;color:#67728e}
+.story-card strong{display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-top:18px;color:#363c55}
+.story-card strong .icon{width:17px;height:17px}
+.story-mode-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 16px;background:#e8ebff;border-bottom:1px solid #d8def5;min-height:38px;flex-shrink:0}
+.story-mode-bar>span{font-size:10px;font-weight:600;color:#4a5380}
+.story-mode-bar .text-button{font-size:10px;color:#4b55c8;padding:3px 0;white-space:nowrap}
+.story-mode .discover:has(.swipe-actions) .hero-image-button{height:clamp(220px,calc(var(--chat-height,100dvh) - 488px),490px)}
+.case-note{background:white;border:1px solid #e1e5ef;border-radius:20px;padding:20px;margin-bottom:20px}
+.case-note>span{font-size:10px;color:#5660f5}
+.case-note>p{font-size:13px;line-height:1.95;margin-top:10px;color:#54617a}
+.case-note>div{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+.case-note small{font-size:10px;color:#77819a}
+.observation-notes{border-left:2px solid #d8dff1;padding-left:15px}
+.observation-notes p{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.9;color:#596781;padding:12px 0}
+.observation-notes .icon{width:16px;height:16px;flex-shrink:0;color:#8d96b4;margin-top:3px}
+.pet-gallery{display:grid;grid-template-columns:1fr;gap:12px}
+.pet-gallery>img{width:100%;height:auto;max-height:480px;object-fit:contain;background:#eceff8;border-radius:18px}
+.sample-media-note{display:block;font-size:10px;line-height:1.7;color:#737a98;padding:5px 0;margin:8px 0}

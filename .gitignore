@@ -1,0 +1,9 @@
+node_modules/
+.env*
+!.env.example
+.preview/
+.local/
+coverage/
+*.log
+*.tar.gz
+.DS_Store

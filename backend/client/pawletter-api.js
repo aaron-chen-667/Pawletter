@@ -1,0 +1,25 @@
+// Browser integration module. No secrets and no automatic upload of local demo state.
+export function createPawletterClient(baseUrl, fetcher=fetch) {
+  const base=baseUrl.replace(/\/$/,'');let token=null;
+  async function call(path,{method='GET',body,headers={},signal}={}) {
+    const binary=typeof Blob!=='undefined'&&body instanceof Blob;
+    const response=await fetcher(`${base}${path}`,{method,signal,credentials:'omit',headers:{...(token?{Authorization:`Bearer ${token}`} : {}),...(body!==undefined&&!binary?{'Content-Type':'application/json'}:{}),...headers},...(body===undefined?{}:{body:binary?body:JSON.stringify(body)})});
+    const data=await response.json();
+    if(!response.ok){const error=new Error(data.error||'REQUEST_FAILED');error.status=response.status;throw error;}return data;
+  }
+  return {
+    async login(username,password){const result=await call('/v1/auth/login',{method:'POST',body:{username,password}});token=result.token;return {user:result.user,expiresAt:result.expiresAt};},
+    async logout(){try{await call('/v1/auth/logout',{method:'POST'});}finally{token=null;}},
+    me:()=>call('/v1/me'),
+    pets:()=>call('/v1/pets'),
+    createPet:body=>call('/v1/pets',{method:'POST',body}),
+    async uploadAudio(petId,blob){return call(`/v1/pets/${encodeURIComponent(petId)}/audio`,{method:'POST',body:blob,headers:{'Content-Type':blob.type.split(';')[0]}});},
+    submitObservation:(petId,body,idempotencyKey)=>call(`/v1/pets/${encodeURIComponent(petId)}/observations`,{method:'POST',body,headers:{'Idempotency-Key':idempotencyKey}}),
+    processObservation:id=>call(`/v1/observations/${encodeURIComponent(id)}/process`,{method:'POST'}),
+    observations:petId=>call(`/v1/pets/${encodeURIComponent(petId)}/observations`),
+    withdrawObservation:id=>call(`/v1/observations/${encodeURIComponent(id)}`,{method:'DELETE'}),
+    retryObservation:id=>call(`/v1/observations/${encodeURIComponent(id)}/retry`,{method:'POST'}),
+    knowledge:petId=>call(`/v1/pets/${encodeURIComponent(petId)}/knowledge`),
+    chat:(petId,question)=>call(`/v1/pets/${encodeURIComponent(petId)}/chat`,{method:'POST',body:{question}})
+  };
+}

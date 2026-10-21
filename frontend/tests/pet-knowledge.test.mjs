@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {freshState,replyFor} from '../dist/domain.js';
+import {initializeCommunity} from '../dist/community.js';
+import {organizeObservation,confirmObservation,knowledgeReply} from '../dist/pet-knowledge.js';
+const setup=()=>{const s=freshState();initializeCommunity(s);s.role='rescue';return s;};
+const update=(text,mode='append')=>({entries:{health:{text,certainty:'observation',mode}},observedOn:'2026-10-21',share:true,media:[],originalText:text});
+test('observation retains negations and cannot be committed by an unrelated role or station',()=>{
+ const text='昨天换粮后软便；没有确认是过敏。';
+ assert.equal(organizeObservation(text).health,'昨天换粮后软便；\n没有确认是过敏。');
+ const s=setup();s.role='user';assert.throws(()=>confirmObservation(s,'orange',update(text)));
+ s.role='rescue';s.activeStationId='garden';assert.throws(()=>confirmObservation(s,'orange',update(text)));
+ s.activeStationId='warm';assert.throws(()=>confirmObservation(s,'orange',{...update(text),share:false}));
+ assert.throws(()=>confirmObservation(s,'orange',{...update(text),entries:{}}));
+ assert.equal(s.pets[0].knowledge,undefined);
+});
+test('confirmed records answer only for their pet, correction retains audit and excludes superseded answers',()=>{
+ const s=setup(),p=s.pets[0],health=p.health;
+ const first=confirmObservation(s,p.id,update('昨天出现软便，原因待核实。'));
+ assert.equal(p.health,health);
+ assert.match(replyFor(p,'它肠胃怎么样？'),/2026-10-21.*暖爪救助站/);
+ assert.match(replyFor(p,'它肠胃怎么样？'),/昨天出现软便/);
+ assert.equal(knowledgeReply(s.pets[1],'它肠胃怎么样？'),null);
+ assert.equal(knowledgeReply(p,'喜欢什么玩具？'),null);
+ confirmObservation(s,p.id,update('已向照护者核实：今天排便恢复正常，仍持续观察。','replace'));
+ assert.ok(p.knowledge.find(n=>n.batchId===first).supersededAt);
+ assert.doesNotMatch(replyFor(p,'肠胃情况？'),/昨天出现软便/);
+ assert.match(replyFor(p,'肠胃情况？'),/今天排便恢复正常/);
+ assert.equal(p.observationSources.length,2);
+ assert.match(replyFor(JSON.parse(JSON.stringify(p)),'肠胃情况？'),/今天排便恢复正常/);
+});

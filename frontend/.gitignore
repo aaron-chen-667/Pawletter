@@ -1,0 +1,7 @@
+node_modules/
+.preview/
+*.log
+*.tar.gz
+.sites/
+.openai/local/
+handoff/

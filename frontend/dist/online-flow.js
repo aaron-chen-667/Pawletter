@@ -21,6 +21,7 @@ export function createObservationSender(client, uuid=()=>crypto.randomUUID()) {
   };
 }
 export const errorMessage=e=>({
+  ROLE_MISMATCH:'账号身份与当前入口不符，请使用对应身份的账号登录。',
   INVALID_CREDENTIALS:'账号或密码不正确，请重新输入。',SESSION_EXPIRED:'登录已过期，请重新登录。',AUTH_REQUIRED:'请先登录。',STATION_REQUIRED:'只有负责这只宠物的救助站可以操作。',
   RATE_LIMITED:'操作有点频繁，请稍后再试。',PAYLOAD_TOO_LARGE:'录音超过 20 MB，请录制短一些。',INVALID_AUDIO_FILE:'无法识别这段音频，请重新录制。',UNSUPPORTED_MEDIA:'不支持这种音频格式，请尝试手机录音或文字。',
   KNOWLEDGE_CHANGED_RETRY:'资料刚刚更新了，请重新发送问题。',PET_NOT_FOUND:'这只宠物暂时不可查看，请刷新列表。',AI_UNAVAILABLE:'Agent 暂时没有回应，请稍后重试。',AI_PROVIDER_ERROR:'Agent 暂时无法回答，请稍后重试。',

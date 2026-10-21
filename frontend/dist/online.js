@@ -2,6 +2,8 @@ import {createPawletterClient} from './pawletter-api.js';
 import {createCaptureController} from './capture.js';
 import {createObservationSender,errorMessage} from './online-flow.js';
 const api=createPawletterClient('https://pawletter-api-446222711695.asia-east1.run.app');
+const roleParam=new URL(location.href).searchParams.get('role');
+const requiredRole=['station','adopter'].includes(roleParam)?roleParam:null;
 const sender=createObservationSender(api),root=document.querySelector('#app');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const topics={habits:'生活习惯',likes:'喜好与互动',diet:'饮食照护',health:'健康观察',other:'其他观察'};
@@ -33,8 +35,10 @@ function snapshot(){
 }
 function render(){
   let content='',title='登录爪爪来信',sub='用已开通的账号，连接真实资料';
+  if(!user&&requiredRole==='station'){title='救助站登录';sub='使用已开通的站点账号';}
+  if(!user&&requiredRole==='adopter'){title='领养者登录';sub='登录你的领养者账号';}
   if(!user){
-    content=`<p class="eyebrow">A REAL CONNECTION</p><h1>让每次了解，<br>都留下真实的记忆。</h1>${card(`<form id="login-form" class="form-stack"><label>账号<input name="username" autocomplete="username" required maxlength="64" autocapitalize="none" spellcheck="false"></label><label>密码<input name="password" type="password" autocomplete="current-password" required maxlength="128"></label><button class="button primary full" ${busy?'disabled':''}>${busy?'正在登录…':'登录'}</button></form>`)}<p class="online-note">账号由管理员开通，救助站权限随账号分配。当前开放宠物资料、语音补充与 Agent 问答；注册实名、申请和回访尚未接入。</p><a class="text-button" href="./">返回浏览</a>`;
+    content=`<p class="eyebrow">${requiredRole==='station'?'FOR EVERY LITTLE LIFE':'A REAL CONNECTION'}</p><h1>${requiredRole==='station'?'照顾它的日常，<br>从一句话开始。':'让每次了解，<br>都留下真实的记忆。'}</h1>${card(`<form id="login-form" class="form-stack"><label>${requiredRole==='station'?'站点账号':'账号'}<input name="username" autocomplete="username" required maxlength="64" autocapitalize="none" spellcheck="false"></label><label>密码<input name="password" type="password" autocomplete="current-password" required maxlength="128"></label><button class="button primary full" ${busy?'disabled':''}>${busy?'正在登录…':requiredRole==='station'?'登录救助站':'登录'}</button></form>`)}<p class="online-note">账号由管理员开通，救助站权限随账号分配。当前开放宠物资料、语音补充与 Agent 问答；注册实名、申请和回访尚未接入。</p><a class="text-button" href="./">返回领养者界面</a>`;
   }else if(view==='home'){
     title=station()?'救助站工作台':'认识你的新伙伴';sub='资料与记录已连接云端';
     const list=station()?owned():pets;
@@ -133,6 +137,7 @@ root.addEventListener('submit',async e=>{
   try{
     if(form.id==='login-form'){
       const result=await api.login(String(data.get('username')),String(data.get('password')));data.delete('password');
+      if(requiredRole&&result.user.role!==requiredRole){await api.logout();throw new Error('ROLE_MISMATCH');}
       pets=(await api.pets()).pets;user=result.user;petId='';view='home';epoch++;
     }else if(form.id==='pet-form'){
       const result=await api.createPet({name:newDraft.name,profile:{species:newDraft.species,description:newDraft.description},published:newDraft.published});

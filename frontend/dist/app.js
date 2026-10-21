@@ -19,6 +19,8 @@ if(storyMode&&!state.sampleStory){storyMode=false;try{sessionStorage.removeItem(
 initializeDiscovery(state);
 initializeCommunity(state);
 enrichCatalog(state);populateDefaultExamples(state);
+// Public browsing always starts as an adopter. Station access requires server login.
+state.role='user';
 let page = { name: state.role === 'rescue' ? 'work' : state.registrationDraft&&!state.account?'register':'meet' };
 let filter = 'all';
 let workFilter='all',animalFilter='all',animalSearch='';
@@ -124,16 +126,20 @@ function leaveCapture(next) {
   if((page.name==='voice'||page.name==='lifestyle')&&next!==page.name)capture.stopVoice();
   if(page.name==='analyzing'&&next!=='analyzing')analysisEpoch++;
 }
-function setRole(role) { state.role=role; save(); navigate(role==='rescue'?'work':'meet');navigationStack=[]; }
+function setRole(role) { if(role==='rescue'){location.assign('?mode=online&role=station');return;}state.role='user';save();navigate('meet');navigationStack=[]; }
 function petStatus(p) { return p.status==='adopted'?'已找到家':p.status==='paused'?'暂停领养':!p.confirmed?'待确认':'等待一个家'; }
 function sectionHeading(eyebrow,title,action='') { return `<div class="section-heading"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2></div>${action}</div>`; }
 function statusPill(p) {return `<span class="status-pill ${p.status==='adopted'?'green':''}"><i></i>${petStatus(p)}</span>`;}
 function empty(title,desc,action='') { return `<div class="empty"><span class="empty-icon">${icon('paw')}</span><h3>${title}</h3><p>${desc}</p>${action}</div>`; }
 function currentApplication(petId) { return state.applications.find(a=>a.petId===petId && a.stage>=0 && (!a.adopterId||a.adopterId===state.account?.id)); }
 function topbar(title,sub='',back=true) {
-  return `<header class="topbar">${back?button(icon('back'),'back','icon-button','','aria-label="返回"'):`<span class="brand-mark">${icon('paw')}</span>`}<div class="topbar-title"><strong>${title}</strong>${sub?`<small>${sub}</small>`:''}</div>${button(icon('settings'),'demo','icon-button','','aria-label="设置"')}</header>`;
+  return `<header class="topbar">${back?button(icon('back'),'back','icon-button','','aria-label="返回"'):`<span class="brand-mark">${icon('paw')}</span>`}<div class="topbar-title"><strong>${title}</strong>${sub?`<small>${sub}</small>`:''}</div>${button(icon('user'),'identity','icon-button','','aria-label="切换身份"')}</header>`;
 }
-function shellHeader() { return `<header class="brand-header"><div class="brand"><span class="brand-mark">${icon('paw')}</span><div><b>爪爪来信</b><small>PAWLETTER</small></div></div><div class="header-actions">${page.name==='meet'?button(`${icon('pin')}<span>${esc(state.location.label)}<small>${state.radius} km · 设置</small></span>`,'location','header-location','','aria-label="位置与距离设置"'):''}${page.name==='meet'?'':button(icon('settings'),'demo','icon-button','','aria-label="设置"')}</div></header>`; }
+function shellHeader() {
+  const locationControl=button(`<span class="location-pin">${icon('pin')}</span><span class="location-copy"><strong>${esc(state.location.label)}</strong><small>附近 ${state.radius} km</small></span>${icon('chevron','location-chevron')}`,'location','header-location','','aria-label="位置与距离设置"');
+  const roleControl=button(`${icon('user')}<span>领养者</span>${icon('chevron','role-chevron')}`,'identity','header-role','','aria-label="切换身份，当前为领养者"');
+  return `<header class="brand-header"><div class="brand"><span class="brand-mark">${icon('paw')}</span><div><b>爪爪来信</b><small>PAWLETTER</small></div></div><div class="header-actions">${page.name==='meet'?locationControl:page.name==='mine'?roleControl:''}</div></header>`;
+}
 function nav() {
   const rescue=state.role==='rescue';
   const items=rescue?[['work','home','工作台'],['animals','paw','动物'],['tracking','book','跟进']]:[['messages','chat','消息'],['meet','compass','遇见'],['mine','user','我的']];
@@ -170,7 +176,7 @@ function render() {
     case 'followup':body=followupPage();break;
     default:body=meetPage();
   }
-  app.innerHTML=`<aside class="desktop-note"><a class="desktop-brand" href="#/">${icon('paw')} PAWLETTER</a><p class="editorial">把相遇，<br>写成回家。</p><p class="desktop-description">一封来自毛茸茸世界的来信。<br>认识它，了解它，然后一起回家。</p><span class="desktop-label">公益领养 · 让陪伴发生</span><div class="desktop-line"></div><p class="desktop-foot">每一个小小的生命，<br>都值得被认真认识。</p></aside><div class="phone-app ${page.name==='chat'?'chat-app':''}">${body}${rootPages.includes(page.name)?nav():''}</div><aside class="desktop-right"><span>01 / MEET A NEW FRIEND</span><p>让喜欢，<br>有一个真实的去处。</p><button data-action="demo">打开设置 ${icon('arrow')}</button><img class="desktop-qr" src="./assets/qr.png" alt="手机扫码访问" /><small>手机扫码体验</small></aside>`;
+  app.innerHTML=`<aside class="desktop-note"><a class="desktop-brand" href="#/">${icon('paw')} PAWLETTER</a><p class="editorial">把相遇，<br>写成回家。</p><p class="desktop-description">一封来自毛茸茸世界的来信。<br>认识它，了解它，然后一起回家。</p><span class="desktop-label">公益领养 · 让陪伴发生</span><div class="desktop-line"></div><p class="desktop-foot">每一个小小的生命，<br>都值得被认真认识。</p></aside><div class="phone-app ${page.name==='chat'?'chat-app':''}">${body}${rootPages.includes(page.name)?nav():''}</div><aside class="desktop-right"><span>01 / MEET A NEW FRIEND</span><p>让喜欢，<br>有一个真实的去处。</p><button data-action="identity">切换身份 ${icon('arrow')}</button><img class="desktop-qr" src="./assets/qr.png" alt="手机扫码访问" /><small>手机扫码体验</small></aside>`;
   app.querySelector('.phone-app').classList.toggle('capture-app',page.name==='intake');
   app.querySelector('.phone-app').classList.toggle('discovery-app',page.name==='meet');
   app.querySelector('.phone-app').classList.toggle('story-mode',storyMode);
@@ -251,14 +257,12 @@ function messagesPage() {
 function minePage() {
   const application=state.applications.find(a=>a.stage>=0),account=state.account;
   return `${shellHeader()}<main class="main"><div class="personal-card"><span class="human-avatar">${esc(account?.nickname[0]||'你')}</span><div><p class="eyebrow">MY LITTLE WORLD</p><h1>${account?'你好，'+esc(account.nickname):'让相遇，有个开始。'}</h1><p>${account?'已完成演示注册 · 尚未真实核验':'先逛逛，准备领养时建立你的账号。'}</p></div></div>
-    <a class="online-entry" href="?mode=online"><span>登录线上账号<small>云端宠物资料 · 语音记录 · Agent 问答</small></span>${icon('arrow')}</a>
     ${account?button('看看我的个人主页 '+icon('arrow'),'public-profile','button primary full'):button('注册领养账号 '+icon('arrow'),'register','button primary full')}
     <div class="stats-row"><div><b>${state.following.length}</b><span>喜欢的小伙伴</span></div><div><b>${state.memory.length}</b><span>偏好与记忆</span></div><div><b>${state.applications.filter(a=>a.stage>=0).length}</b><span>领养申请</span></div></div>
     <div class="menu-card">${menu('home','我的领养进度',application?activePet(state,application.petId)?.name+' · '+stages[application.stage]:'还没有提交申请','progress')}${menu('heart','救助站评价','0–5 星 · 定期回访与照护记录','ratings')}${menu('clock','生活画像与陪伴时间',account?.lifestyle?'已记录作息、空闲时间与领养预期 · 查看资料':account?'尚未记录 · 补充生活资料':'注册时通过语音对话建立画像','lifestyle')}${menu('shield','身份与领养公约','身份信息不在主页公开','account')}</div>
 ${sectionHeading('GETTING TO KNOW YOU','越了解，越合拍')}
     <div class="menu-card">${menu('book','我的偏好与记忆','你说过的喜欢，都可以修改','memory')}${menu('heart','我关注的小伙伴','看看想继续了解的它们','saved')}${menu('shield','主动招呼设置',state.consent?'已开启 · 点击暂停':'未开启 · 点击开启','consent',state.consent?'off':'on')}${menu('home','认识救助站','主页、待领养伙伴与专属 Agent','stations')}</div>
     <div class="join-station">${icon('home')} 我是救助站负责人 ${button('联系开通','station-onboarding','text-button')}</div>
-    ${button('预览救助者工作台（演示） '+icon('arrow'),'role','button secondary full','rescue')}
   </main>`;
 }
 function menu(i,title,sub,action,value='') {return `<button class="menu-item" data-action="${action}" data-value="${value}"><span class="menu-icon">${icon(i)}</span><span><strong>${title}</strong><small>${sub}</small></span>${icon('chevron')}</button>`;}
@@ -335,7 +339,6 @@ function workPage() {
   ];
   const visible=tasks.filter(t=>workFilter==='all'||t.type===workFilter);
   return `${topbar(esc(station.name),'今天，把待办一件件处理好',false)}<main class="main rescue-work">
-    <a class="online-entry" href="?mode=online"><span>登录救助站账号<small>使用线上宠物档案与真实语音归档</small></span>${icon('arrow')}</a>
     <div class="rescue-shortcuts">${button(icon('camera')+' 录入新伙伴','intake','button primary')}${button(icon('mic')+' 给宠物补充','pet-observation','button secondary')}</div>
     <div class="station-inline">${button('站点主页 '+icon('chevron'),'station','text-button',station.id)}<span>${team.length} 只宠物 · ${tasks.length} 项待办</span></div>
     <div class="task-tabs" aria-label="待办分类">${[['all','全部'],['application','申请'],['followup','回访'],['draft','档案'],['rating','评价']].map(([id,label])=>button(label+' '+(id==='all'?tasks.length:tasks.filter(t=>t.type===id).length),'work-filter',workFilter===id?'active':'',id)).join('')}</div>
@@ -542,7 +545,10 @@ function renderOverlay() {
   if(!overlay) {overlayRoot.innerHTML=''; document.body.classList.remove('modal-open');return;}
   document.body.classList.add('modal-open');
   let title='',body='';
-  if(overlay.type==='request-followup') {
+  if(overlay.type==='identity') {
+    title='切换身份';
+    body=`<p class="modal-intro">选择你在这里的身份</p><div class="identity-options"><button class="identity-option selected" data-action="identity-adopter"><span class="identity-symbol">${icon('user')}</span><span><strong>领养者</strong><small>认识小伙伴，寻找适合的陪伴</small></span><span class="identity-current">当前</span></button><a class="identity-option" href="?mode=online&role=station"><span class="identity-symbol station">${icon('home')}</span><span><strong>救助站</strong><small>登录站点账号，管理宠物与资料</small></span>${icon('chevron')}</a></div>`;
+  } else if(overlay.type==='request-followup') {
     const a=state.applications.find(a=>a.id===overlay.id&&a.stage===3),pet=a&&activePet(state,a.petId);
     title='发起一次回访';
     body=!a||state.role!=='rescue'||stationFor(pet).id!==state.activeStationId?'<p>这份领养暂不能发起回访。</p>':`<p class="modal-intro">邀请 ${esc(a.name)} 记录 ${esc(pet.name)} 的近况</p><form id="followup-request-form" data-application="${a.id}" class="form-stack"><label>希望收到<select name="kind"><option value="photo">照片</option><option value="video">视频</option><option value="audio">语音</option><option value="any">照片、视频或语音均可</option></select></label><label>想了解什么<textarea name="message" required maxlength="300" rows="3">想看看最近的生活状态，请拍一张近照，再说说饮食、活动和适应情况。</textarea></label><label>希望多久内反馈<select name="dueDays"><option value="3">3 天内</option><option value="1">1 天内</option><option value="7">7 天内</option></select></label><p class="footnote">当前仅支持站内请求，短信和微信通知尚未接入。回访素材默认仅站点可见，主页展示仍需领养者另行授权。</p><p class="form-error" role="alert"></p><button class="button primary full" type="submit">发送回访邀请</button></form>`;
@@ -620,6 +626,8 @@ document.addEventListener('click',async event=>{
   const {action,value}=target.dataset;
   switch(action) {
     case 'nav':navigate(value);break;
+    case 'identity':openOverlay('identity');break;
+    case 'identity-adopter':overlay=null;state.role='user';save();render();break;
     case 'work-filter':workFilter=value;render();break;
     case 'animal-filter':animalFilter=value;render();break;
     case 'agent-settings':navigate('agent-settings',value);break;
@@ -988,7 +996,7 @@ window.addEventListener('blur',()=>{if(observationHold)finishObservationHold(tru
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'&&overlay&&!publishingFeedback){overlay=null;renderOverlay();}
   if(event.key==='Tab'&&overlay){
-    const focusable=[...overlayRoot.querySelectorAll('button:not([disabled]), input, select, textarea, video[controls]')];
+    const focusable=[...overlayRoot.querySelectorAll('button:not([disabled]), a[href], input, select, textarea, video[controls]')];
     if(!focusable.length)return;
     const first=focusable[0],last=focusable.at(-1);
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
@@ -1003,4 +1011,5 @@ updateViewport();
 render();
 
 const linkedStory=new URL(location.href).searchParams.get('story');
-if(storyCards.some(s=>s.id===linkedStory)&&state.sampleStory!==linkedStory)switchStory(linkedStory);
+if(linkedStory==='station-day')location.replace('?mode=online&role=station');
+else if(storyCards.some(s=>s.id===linkedStory)&&state.sampleStory!==linkedStory)switchStory(linkedStory);

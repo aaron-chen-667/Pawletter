@@ -1,6 +1,14 @@
-.header-location{display:flex;align-items:center;gap:5px;text-align:left;border:1px solid #e0e5f1;border-radius:14px;padding:7px 10px;background:white;color:var(--ink);font-size:12px;font-weight:700}
-.header-location .icon{width:16px;height:16px;color:#5660f5}
-.header-location small{display:block;font-size:9px;font-weight:500;color:#67728c;margin-top:2px}
+.header-location{display:flex;align-items:center;gap:8px;text-align:left;border:0;border-radius:18px;padding:8px 10px 8px 8px;background:#edefff;color:var(--ink);min-height:48px;font-size:13px;font-weight:700}
+.header-location .location-pin{display:grid;place-items:center;background:white;border-radius:50%;width:28px;height:28px;flex-shrink:0}
+.header-location .icon{width:17px;height:17px;color:#5660f5}
+.header-location .location-copy{min-width:0;display:block}.header-location strong{display:block;max-width:94px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.header-location small{display:block;font-size:10px;font-weight:500;color:#646a83;margin-top:3px;white-space:nowrap}
+.header-location .location-chevron{width:13px;height:13px;transform:rotate(90deg);color:#727b99}
+.header-role{min-height:44px;display:flex;align-items:center;gap:7px;border-radius:30px;background:#edefff;padding:10px 12px;font-size:12px;font-weight:700;white-space:nowrap}
+.header-role .icon{width:17px;height:17px;color:#5660f5}.header-role .role-chevron{width:12px;height:12px;transform:rotate(90deg)}
+.identity-options{display:grid;gap:12px}.identity-option{width:100%;display:flex;gap:12px;align-items:center;text-align:left;padding:18px 14px;background:#f6f7fc;border:1px solid #e5e7f1;border-radius:22px}
+.identity-option.selected{background:#f3ffe0;border-color:#c7ee77}.identity-option>span:nth-child(2){flex:1}.identity-option strong{display:block;font-size:17px}.identity-option small{display:block;margin-top:6px;font-size:12px;color:#747b8e;line-height:1.7}
+.identity-symbol{width:42px;height:42px;border-radius:15px;display:grid;place-items:center;background:#d5ff62;flex-shrink:0}.identity-symbol.station{background:#e5dfff;color:#6451d3}.identity-current{font-size:11px;color:#486515}
 .discovery-app .brand-header{padding-top:16px;padding-bottom:8px}
 .discovery-app .brand small{letter-spacing:2px}
 .discovery-meta{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#6e7892;margin-bottom:10px}

@@ -5,7 +5,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { createApp } from '../src/app.js';
 import { migrate } from '../src/db.js';
 import { provision } from '../src/auth.js';
-import { validateExtraction, createAI } from '../src/ai.js';
+import { validateExtraction, createAI, sourceSentences, resolveSelection } from '../src/ai.js';
 import { processOne } from '../src/worker.js';
 
 let engine,db,app,station,other,adopter,pet,privatePet;
@@ -117,8 +117,16 @@ test('extraction preserves full statements and uncertainty',()=>{
 });
 test('provider adapter uses configured model and never forwards provider error bodies',async()=>{
  let model;
- const provider=createAI({AI_BASE_URL:'https://provider.invalid/v1',AI_API_KEY:'fake-test-key',AI_CHAT_MODEL:'configured-model'},async(url,options)=>{model=JSON.parse(options.body).model;return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({items:[{topic:'likes',quote:'每天喜欢玩。',certainty:'ongoing'}]})}}]}));});
+ const provider=createAI({AI_BASE_URL:'https://provider.invalid/v1',AI_API_KEY:'fake-test-key',AI_CHAT_MODEL:'configured-model'},async(url,options)=>{model=JSON.parse(options.body).model;return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({items:[{sourceId:'s0',topic:'likes',certainty:'ongoing'}]})}}]}));});
  assert.equal((await provider.extract('每天喜欢玩。')).length,1);assert.equal(model,'configured-model');
  const failing=createAI({AI_BASE_URL:'https://provider.invalid/v1',AI_API_KEY:'fake'},async()=>new Response('private credentials',{status:401}));
  await assert.rejects(()=>failing.extract('test'),error=>error.code==='AI_PROVIDER_ERROR'&&!error.message.includes('private credentials'));
+});
+test('AI selects source IDs while server retains subjects, negations and multi-clause context',()=>{
+ const transcript='吐司平时不喜欢抱抱。每天晚上比较活跃，白天喜欢在安静的地方睡觉。';
+ const sources=sourceSentences(transcript);
+ const notes=resolveSelection({items:[{sourceId:'s0',topic:'likes',certainty:'ongoing'},{sourceId:'s1',topic:'habits',certainty:'ongoing'}]},sources,transcript);
+ assert.equal(notes[0].quote,'吐司平时不喜欢抱抱。');
+ assert.equal(notes[1].quote,'每天晚上比较活跃，白天喜欢在安静的地方睡觉。');
+ assert.throws(()=>resolveSelection({items:[{sourceId:'invented',topic:'likes',certainty:'ongoing'}]},sources,transcript));
 });

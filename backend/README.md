@@ -1,14 +1,14 @@
 # Pawletter 服务端：宠物资料与 Agent 问答
 
-这是爪爪来信独立后端第一批模块，目标是内部联调。代码已实现，不代表已部署。前端 v6 仍使用原有本地数据；不会因为启动此服务而自动同步浏览器记录。
+这是爪爪来信独立后端第一批模块，目标是内部联调。2026-10-21 已部署到 Cloud Run，服务地址为 https://pawletter-api-446222711695.asia-east1.run.app 。前端 v6 仍使用原有本地数据；不会因为启动此服务而自动同步浏览器记录。
 
 ## 本批范围
 
 - 管理员预置测试账号，密码 scrypt 哈希、数据库持久化短期会话、退出撤销；角色和所属站点由服务端决定。
 - 救助站创建宠物、上传录音、自由口述补充、自动归档、查看进度、修正和撤回。
 - PostgreSQL 保存原始口述、转写、来源、知识条目及审计；GCS 保存私有音频，访问始终经过账号权限校验。
-- openai-next 的 `/audio/transcriptions` 与 `/chat/completions` 适配器。配置沿用交接表的 `whisper-1` 和 `gemini-3.8-flash`；尚未真实验证模型可用性。
-- 任务先入库，再由受认证的请求执行；Cloud Scheduler 负责页面关闭后的处理与重试。未创建 Scheduler 前，只有前端调用 process 才执行。
+- openai-next 的 `/audio/transcriptions` 与 `/chat/completions` 适配器。配置沿用交接表的 `whisper-1` 和 `gemini-3.8-flash`。模型按编号选择并分类原文句子，服务端保存完整原句，避免整理时改写事实。
+- 任务先入库，再由受认证的请求执行；已创建的 Cloud Scheduler 每分钟处理一条，负责页面关闭后的处理与重试。
 - Agent 仅接收该宠物已归档且允许共享的资料，返回来源引用；资料不足明确说明。原始录音与站点私有补充不向领养者开放。
 
 仍待实现：照片/视频解析、新宠物 AI 建档、领养者注册访谈与身份核验、申请/回访/评价/公开主页业务 API、偏好记忆与主动匹配，以及前端账号与数据迁移接入。当前不是完整生产后端，不应采集真实身份证材料。
@@ -24,7 +24,9 @@ npm run migrate
 npm start
 ```
 
-集成测试使用 PGlite 运行 PostgreSQL SQL，不需要云端密钥。测试覆盖站点隔离、重复提交、私有音频、修正/撤回、任务重试与过期租约、推理期间撤回以及模型输出校验。尚未覆盖真实 Cloud SQL 网络、GCS、第三方 AI、Cloud Scheduler 和多实例竞争。
+14 项集成及适配器测试使用 PGlite 运行 PostgreSQL SQL，不需要云端密钥。测试覆盖站点隔离、重复提交、私有音频、修正/撤回、任务重试与过期租约、推理期间撤回以及模型输出校验。云端另行验证数据库、GCS、模型和 Scheduler；真实手机录音、完整前后端联调及多实例负载仍待验证。
+
+`scripts/verify-cloud.js` 在同一应用镜像内使用运行身份验证数据库、私有存储、真实模型提取和问答。可通过 `VERIFY_AUDIO_OBJECT` 提供 `system/verification/` 下的合成 WAV，额外验证转写与提取；脚本只输出检查状态并删除测试文件。2026-10-21 执行 `pawletter-verify-6dtfx` 五项通过。该检查会调用模型并产生少量 API 用量，不等同于手机端全流程验收。
 
 管理员通过 `npm run provision` 的标准输入传入一个 JSON 对象：`username`、`password`（12–128 字符）、`role`（station/adopter）；站点账号还需 `stationId`、`stationName`。运行位置必须能连接数据库。密码不得放入命令行参数、代码、构建配置或日志；脚本仅返回用户 ID，不开放在线自助提权入口。
 
@@ -46,7 +48,7 @@ npm start
 
 项目 `pawletter-adoption`，区域 `asia-east1`，Cloud Run `pawletter-api`。
 
-1. 权限：构建提交者须能 actAs 默认构建账号 `446222711695-compute@developer.gserviceaccount.com`，构建账号须有构建、镜像推送、源码读取和日志写入权限。运行账号 `pawletter-run@pawletter-adoption.iam.gserviceaccount.com` 使用数据库、GCS 和 Secret Manager 权限。2026-10-21 复查时，前一项仍未授予，不能继续默认 Cloud Build 部署。
+1. 权限：构建提交者须能 actAs 默认构建账号 `446222711695-compute@developer.gserviceaccount.com`，构建账号须有构建、镜像推送、源码读取和日志写入权限。运行账号 `pawletter-run@pawletter-adoption.iam.gserviceaccount.com` 使用数据库、GCS 和 Secret Manager 权限。2026-10-21 已核验权限并成功构建、部署，无需再次授权。
 2. 本目录提交构建：
 
 ```sh

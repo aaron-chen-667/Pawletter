@@ -1,0 +1,38 @@
+爪爪来信：首批后端部署记录
+日期：2026-10-21
+
+项目：pawletter-adoption（446222711695）
+区域：asia-east1
+服务：pawletter-api
+服务版本：pawletter-api-00004-knj，100% 流量。
+数据库迁移：pawletter-migrate-wxlf9，成功。
+地址：https://pawletter-api-446222711695.asia-east1.run.app
+代码仓：https://github.com/aaron-chen-667/Pawletter
+
+构建 ID：d3bd77d7-18b4-4ba5-bda9-0726d21e105c
+镜像：asia-east1-docker.pkg.dev/pawletter-adoption/pawletter/api:d3bd77d7-18b4-4ba5-bda9-0726d21e105c
+摘要：sha256:3d2550c1c676e8c24a06949b8e788a57d515e08f7292cb80a8a917fc788b8fef
+
+部署与权限：
+- 开发账号已获得构建账号 actAs；构建账号已有 Cloud Build 构建角色。
+- 迁移作业先于服务更新执行；现有数据保留，不重建数据库。
+- 数据库和模型密钥使用 Secret Manager 的 version 1 引用，未进入代码或镜像。
+- Scheduler pawletter-observations 每分钟通过 Google OIDC 调用内部任务处理接口。
+
+云端验证作业：pawletter-verify-6dtfx，成功。
+1. Cloud SQL 业务表查询通过。
+2. 私有 GCS 测试文件写入、读取、删除通过。
+3. 真实模型资料提取通过。
+4. 真实 Agent 回答及来源引用通过。
+5. 合成中文 WAV 的真实转写及自动提取通过，测试音频已删除。
+
+新版本部署后检查：/health 与 /ready 返回 200；未登录访问 /v1/pets 返回 401；无 OIDC 的 JSON POST /internal/process 返回 401。Scheduler 为 ENABLED，最近一次调用成功。仓库前端 25 项与后端 14 项测试全部通过。
+
+验证中修复：模型改写原句会破坏事实引用，因此改为选择句子编号和类别，由服务端保留完整原句。否定、时间条件和不确定描述保留在资料内。
+
+当前范围：测试账号权限、宠物档案、录音、补充资料、自动提取、撤回/修正、资料库和问答。
+现有 H5 v6 仍使用本地数据，尚未接入线上登录或服务器宠物 ID；还没有预置长期使用的云端测试账号。
+注册实名、用户访谈、匹配、领养申请、回访、评价、公开主页等完整业务 API 尚待实现。
+未完成手机真机录音、完整业务联调和负载测试。
+
+非阻断观察：云端验证时 Google 存储调用的 PassThrough 发出了 MaxListenersExceededWarning；验证正常结束。正式负载测试时需复查依赖及连接行为。

@@ -2,6 +2,8 @@
 日期：2026-10-21
 
 入口：https://pawletter-adoption-h5.chenaaron668.chatgpt.site/?mode=online
+发布版本：H5 v7（2026-10-21 发布成功）
+Sites 源码提交：d227b0c7bb5f126cbb2e8139f388e8587ea46800
 原入口仍保留本地完整产品体验；“我的”和救助站工作台新增线上账号登录入口。
 
 一、账号

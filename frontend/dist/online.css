@@ -1,0 +1,25 @@
+.online-app{padding-bottom:calc(30px + env(safe-area-inset-bottom));min-height:100dvh}
+.online-app .main{padding-top:12px}.online-app .topbar{position:sticky;top:0;z-index:5;background:var(--bg);gap:12px}
+.online-app .topbar strong{font-size:20px}.online-app .topbar small{display:block;color:var(--muted);margin-top:4px}
+.online-app .online-card{padding:20px;background:white;border:1px solid var(--line);border-radius:24px;margin:16px 0}
+.online-app .online-card h2{margin-bottom:12px}.online-app .online-card p{white-space:pre-wrap;overflow-wrap:anywhere}
+.online-app .form-stack{display:grid;gap:20px}.online-app label{display:grid;gap:9px;font-size:14px}
+.online-app input,.online-app select,.online-app textarea{width:100%;padding:14px;border:1px solid var(--line);background:white;border-radius:16px;font-size:16px;color:var(--ink)}
+.online-app .check-label{display:flex;align-items:flex-start;gap:12px}.online-app .check-label input{width:22px;height:22px;flex-shrink:0}
+.online-app .check-label small{display:block;color:var(--muted);line-height:1.7;margin-top:4px}
+.online-app .online-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.online-app .online-actions>*{flex:1;min-width:100px}
+.online-app .text-button{min-height:44px;font-size:13px}.online-app .online-error{padding:12px 16px;border-radius:14px;background:#fff0f3;color:#a1264c;line-height:1.7;margin:10px 0}
+.online-app .online-error:empty{display:none}.online-app .online-note{color:var(--muted);font-size:13px;line-height:1.8;margin:12px 0}
+.online-app .online-pet{width:100%;display:flex;gap:14px;align-items:center;text-align:left;padding:20px;background:white;border-radius:22px;border:1px solid var(--line);margin:12px 0}
+.online-app .pet-symbol{width:54px;height:54px;border-radius:18px;background:#e8e1ff;display:grid;place-items:center;font-size:27px;flex-shrink:0}
+.online-app .online-pet strong{font-size:18px;display:block}.online-app .online-pet small{display:block;color:var(--muted);margin-top:6px;line-height:1.6}
+.online-app .live-tag{background:#d3ff57;color:#18211e;padding:5px 10px;border-radius:20px;font-size:12px;display:inline-block}
+.online-app .online-voice{width:170px;height:170px;margin:30px auto;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;border-radius:50%;background:#d3ff57;box-shadow:0 6px 0 #1a1b26;font-weight:700;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.online-app .online-voice svg{width:48px;height:48px}.online-app .online-voice.recording{background:#ff95bf;box-shadow:0 0 0 12px #ff95bf25}
+.online-app audio{width:100%;margin:12px 0}.online-app details{margin:14px 0}.online-app summary{cursor:pointer;min-height:44px;padding:10px 0}
+.online-app .chat-bubble{padding:18px;border-radius:20px;background:white;margin:14px 0;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}
+.online-app .chat-bubble.mine{background:#e8e1ff;margin-left:30px}.online-app .citation{border-left:3px solid #b4a4ff;padding:10px 14px;font-size:13px;background:#f7f5ff;margin:10px 0;white-space:pre-wrap}
+.online-app .chat-compose{position:sticky;bottom:0;background:var(--bg);padding:15px 0;display:grid;gap:10px}.online-app .chat-compose textarea{min-height:70px}
+.online-app .record-status{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:13px;margin-bottom:10px}.online-app .record-status time{color:var(--muted)}
+.online-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-radius:20px;background:#e8e1ff;margin:0 0 18px;font-size:14px;font-weight:700}.online-entry small{display:block;font-weight:400;font-size:12px;margin-top:5px;color:#60657c}
+@media(max-width:360px){.online-app .main{padding-left:16px;padding-right:16px}.online-app .topbar{padding-left:16px;padding-right:16px}}

@@ -14,7 +14,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm --prefix frontend ci
       - run: npm --prefix backend ci
       - run: npm run check
       - run: npm test

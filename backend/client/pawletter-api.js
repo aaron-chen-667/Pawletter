@@ -3,8 +3,8 @@ export function createPawletterClient(baseUrl, fetcher=fetch) {
   const base=baseUrl.replace(/\/$/,'');let token=null;
   async function call(path,{method='GET',body,headers={},signal}={}) {
     const binary=typeof Blob!=='undefined'&&body instanceof Blob;
-    const response=await fetcher(`${base}${path}`,{method,signal,credentials:'omit',headers:{...(token?{Authorization:`Bearer ${token}`} : {}),...(body!==undefined&&!binary?{'Content-Type':'application/json'}:{}),...headers},...(body===undefined?{}:{body:binary?body:JSON.stringify(body)})});
-    const data=await response.json();
+    const response=await fetcher(`${base}${path}`,{method,signal:signal||AbortSignal.timeout(190000),credentials:'omit',headers:{...(token?{Authorization:`Bearer ${token}`} : {}),...(body!==undefined&&!binary?{'Content-Type':'application/json'}:{}),...headers},...(body===undefined?{}:{body:binary?body:JSON.stringify(body)})});
+    let data;try{data=await response.json();}catch{throw new Error('INVALID_RESPONSE');}
     if(!response.ok){const error=new Error(data.error||'REQUEST_FAILED');error.status=response.status;throw error;}return data;
   }
   return {

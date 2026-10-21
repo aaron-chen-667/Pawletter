@@ -251,6 +251,7 @@ function messagesPage() {
 function minePage() {
   const application=state.applications.find(a=>a.stage>=0),account=state.account;
   return `${shellHeader()}<main class="main"><div class="personal-card"><span class="human-avatar">${esc(account?.nickname[0]||'你')}</span><div><p class="eyebrow">MY LITTLE WORLD</p><h1>${account?'你好，'+esc(account.nickname):'让相遇，有个开始。'}</h1><p>${account?'已完成演示注册 · 尚未真实核验':'先逛逛，准备领养时建立你的账号。'}</p></div></div>
+    <a class="online-entry" href="?mode=online"><span>登录线上账号<small>云端宠物资料 · 语音记录 · Agent 问答</small></span>${icon('arrow')}</a>
     ${account?button('看看我的个人主页 '+icon('arrow'),'public-profile','button primary full'):button('注册领养账号 '+icon('arrow'),'register','button primary full')}
     <div class="stats-row"><div><b>${state.following.length}</b><span>喜欢的小伙伴</span></div><div><b>${state.memory.length}</b><span>偏好与记忆</span></div><div><b>${state.applications.filter(a=>a.stage>=0).length}</b><span>领养申请</span></div></div>
     <div class="menu-card">${menu('home','我的领养进度',application?activePet(state,application.petId)?.name+' · '+stages[application.stage]:'还没有提交申请','progress')}${menu('heart','救助站评价','0–5 星 · 定期回访与照护记录','ratings')}${menu('clock','生活画像与陪伴时间',account?.lifestyle?'已记录作息、空闲时间与领养预期 · 查看资料':account?'尚未记录 · 补充生活资料':'注册时通过语音对话建立画像','lifestyle')}${menu('shield','身份与领养公约','身份信息不在主页公开','account')}</div>
@@ -334,6 +335,7 @@ function workPage() {
   ];
   const visible=tasks.filter(t=>workFilter==='all'||t.type===workFilter);
   return `${topbar(esc(station.name),'今天，把待办一件件处理好',false)}<main class="main rescue-work">
+    <a class="online-entry" href="?mode=online"><span>登录救助站账号<small>使用线上宠物档案与真实语音归档</small></span>${icon('arrow')}</a>
     <div class="rescue-shortcuts">${button(icon('camera')+' 录入新伙伴','intake','button primary')}${button(icon('mic')+' 给宠物补充','pet-observation','button secondary')}</div>
     <div class="station-inline">${button('站点主页 '+icon('chevron'),'station','text-button',station.id)}<span>${team.length} 只宠物 · ${tasks.length} 项待办</span></div>
     <div class="task-tabs" aria-label="待办分类">${[['all','全部'],['application','申请'],['followup','回访'],['draft','档案'],['rating','评价']].map(([id,label])=>button(label+' '+(id==='all'?tasks.length:tasks.filter(t=>t.type===id).length),'work-filter',workFilter===id?'active':'',id)).join('')}</div>

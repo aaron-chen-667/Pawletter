@@ -58,6 +58,14 @@ test('private notes stay out of adopter knowledge and Agent context',async()=>{
  const stationNotes=(await request(station,'GET',`/v1/pets/${pet}/knowledge`)).json().notes;assert.ok(stationNotes.length>0);
  assert.equal((await request(adopter,'GET',`/v1/pets/${pet}/observations`)).statusCode,403);
 });
+test('question retrieval includes relevant original words when AI topic classification differs',async()=>{
+ const id=await submit('每天喜欢玩逗猫棒。');
+ extractOverride=async text=>[{topic:'habits',quote:text,certainty:'ongoing'}];
+ try{await processOne({db,ai,storage},id);}finally{extractOverride=null;}
+ const answer=await request(adopter,'POST',`/v1/pets/${pet}/chat`,{question:'它喜欢玩什么？'});
+ assert.equal(answer.statusCode,200,answer.body);assert.equal(answer.json().citations[0].quote,'每天喜欢玩逗猫棒。');
+ await request(station,'DELETE',`/v1/observations/${id}`);
+});
 test('audio uploaded to one pet cannot be assigned to another; audio stays private',async()=>{
  const bytes=Buffer.concat([Buffer.from('1a45dfa3','hex'),Buffer.alloc(20)]);
  const upload=await request(station,'POST',`/v1/pets/${pet}/audio`,bytes,{'content-type':'audio/webm'});assert.equal(upload.statusCode,201,upload.body);

@@ -12,6 +12,7 @@ import { audioTypes, validAudio } from './storage.js';
 const text = max => z.string().trim().min(1).max(max);
 const observationBody = z.object({text:z.string().trim().max(12000).default(''),mediaId:z.string().uuid().optional(),shareWithAgent:z.boolean().default(false),replacesId:z.string().uuid().optional()}).strict().refine(v=>!!v.text || !!v.mediaId,'Text or audio is required');
 const publicPet = row => ({id:row.id,name:row.name,stationId:row.station_id,profile:row.profile});
+const topicWords={health:'健康|肠胃|软便|呕吐|生病|疫苗|绝育|过敏|食欲',diet:'饮食|吃|喝|粮|喂|罐头',habits:'作息|习惯|睡|独处|厕所|猫砂|散步',likes:'喜欢|玩|抱|摸|怕|躲|亲近|互动'};
 export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin = 'https://pawletter-adoption-h5.chenaaron668.chatgpt.site', logger = false }) {
   const app = Fastify({logger,disableRequestLogging:true,bodyLimit:20*1024*1024,requestTimeout:180000,trustProxy:false});
   const deps = {db,ai,storage};
@@ -108,13 +109,12 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   async function notesFor(petId,includePrivate=false,topics=null){return (await db.query(`SELECT k.id,k.quote,k.topic,k.certainty,o.created_at AS recorded_at,s.name AS station
     FROM knowledge k JOIN observations o ON o.id=k.observation_id JOIN pets p ON p.id=k.pet_id JOIN stations s ON s.id=p.station_id
     WHERE k.pet_id=$1 AND o.status='archived' AND (o.share_with_agent=true OR $2::boolean=true)
-      AND ($3::text[] IS NULL OR k.topic=ANY($3::text[]))
-    ORDER BY o.created_at DESC,k.id LIMIT 100`,[petId,includePrivate,topics])).rows;}
+    ORDER BY CASE WHEN $3::text[] IS NULL THEN 0 WHEN k.topic=ANY($3::text[]) OR k.quote ~ $4::text THEN 0 ELSE 1 END,
+      o.created_at DESC,k.id LIMIT 100`,[petId,includePrivate,topics,topics?.map(topic=>topicWords[topic]).filter(Boolean).join('|')||'(?!)'])).rows;}
   app.get('/v1/pets/:id/knowledge',{preHandler:auth},async req=>{const pet=await petFor(req.user,req.params.id);return {notes:await notesFor(pet.id,req.user.station_id===pet.station_id)};});
   app.post('/v1/pets/:id/chat',{preHandler:auth,config:{rateLimit:{max:15,timeWindow:'1 minute'}}},async req=>{
     const pet=await petFor(req.user,req.params.id), {question}=z.object({question:text(2000)}).strict().parse(req.body);
-    const patterns={health:/健康|肠胃|软便|呕吐|生病|疫苗|绝育|过敏|食欲/,diet:/饮食|吃|喝|粮|喂|罐头/,habits:/作息|习惯|睡|独处|厕所|猫砂|散步/,likes:/喜欢|玩|抱|摸|怕|躲|亲近|互动/};
-    const topics=Object.entries(patterns).filter(([,pattern])=>pattern.test(question)).map(([topic])=>topic);
+    const topics=Object.entries(topicWords).filter(([,pattern])=>new RegExp(pattern).test(question)).map(([topic])=>topic);
     const notes=await notesFor(pet.id,false,topics.length?topics:null), result=await ai.answer({pet,notes:notes.slice(0,30),question});
     // Re-read after slow inference: withdrawn/corrected material must not escape in a late answer.
     const active=await notesFor(pet.id,false,topics.length?topics:null), activeIds=new Set(active.map(n=>n.id));

@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "node server.mjs",
-    "check": "node --check dist/app.js && node --check dist/domain.js && node --check dist/capture.js && node --check dist/discovery.js && node --check dist/media-store.js && node --check dist/community.js && node --check dist/community-ui.js && node --check dist/samples.js && node --check dist/lifestyle.js && node --check dist/pet-knowledge.js",
-    "test": "node --test tests/domain.test.mjs tests/discovery.test.mjs tests/community.test.mjs tests/samples.test.mjs tests/lifestyle.test.mjs tests/pet-knowledge.test.mjs",
+    "check": "node --check dist/app.js && node --check dist/domain.js && node --check dist/capture.js && node --check dist/discovery.js && node --check dist/media-store.js && node --check dist/community.js && node --check dist/community-ui.js && node --check dist/samples.js && node --check dist/lifestyle.js && node --check dist/pet-knowledge.js && node --check dist/entry.js && node --check dist/online.js && node --check dist/online-flow.js && node --check dist/pawletter-api.js",
+    "test": "node --test tests/domain.test.mjs tests/discovery.test.mjs tests/community.test.mjs tests/samples.test.mjs tests/lifestyle.test.mjs tests/pet-knowledge.test.mjs tests/online-flow.test.mjs tests/online-dom.test.mjs",
     "test:adopter-ui": "node tests/adopter-ui.mjs",
     "test:rescue-ui": "node tests/rescue-ui.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.3"
   }
 }

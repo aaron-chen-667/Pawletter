@@ -1,4 +1,4 @@
-// Browser media only. No footage or audio is sent to an AI service in this demo.
+// Captures browser media only; each consuming flow decides whether to upload it.
 export function createCaptureController({ onChange, onError }) {
   const media = {
     stream: null, cameraPending: false, cameraError: '', facing: 'environment',

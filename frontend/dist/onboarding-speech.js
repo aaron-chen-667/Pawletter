@@ -1,0 +1,20 @@
+const API='https://pawletter-api-446222711695.asia-east1.run.app';
+export function createOnboardingSpeech(fetcher=fetch){
+ let generation=0,controller;
+ function cancel(){generation++;controller?.abort();}
+ async function transcribe(audioUrl){
+  cancel();const current=generation;controller=new AbortController();const activeController=controller,signal=controller.signal;
+  const timeout=setTimeout(()=>activeController.abort(),70000);
+  try{
+   const blob=await (await fetcher(audioUrl,{signal})).blob();
+   if(blob.size>6*1024*1024)throw new Error('录音太大，请缩短后重新说一段。');
+   const response=await fetcher(`${API}/v1/onboarding/transcribe`,{method:'POST',body:blob,signal,headers:{'Content-Type':blob.type.split(';')[0]}});
+   if(!response.ok)throw new Error(response.status===429?'转写暂时繁忙，请稍后重试，或先用文字回答。':'语音转写未完成，录音已保留，可以重试。');
+   const result=await response.json();
+   if(typeof result.text!=='string'||!result.text.trim())throw new Error('没有识别到清晰的话语，请重录或输入文字。');
+   return current===generation?{text:result.text.trim()}:null;
+  }catch(error){return current===generation?{error:error.name==='AbortError'?'转写超时，录音已保留，请重试。':error.message}:null;}
+  finally{clearTimeout(timeout);}
+ }
+ return {cancel,transcribe};
+}

@@ -38,6 +38,25 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     return pet;
   }
   const audit = (client,user,action,id) => client.query('INSERT INTO audit_events(id,actor_id,action,target_id) VALUES($1,$2,$3,$4)',[randomUUID(),user.id,action,id]);
+  app.post('/v1/onboarding/transcribe',{bodyLimit:6*1024*1024,config:{rateLimit:{max:8,timeWindow:'1 minute'}}},async req=>{
+    // Origin is a browser boundary, not authentication. Shared quotas bound anonymous spend.
+    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    const mime=req.headers['content-type']?.split(';')[0];
+    assert(validAudio(req.body,mime),400,'INVALID_AUDIO_FILE');
+    await transaction(db,async client=>{
+      await client.query('SELECT pg_advisory_xact_lock(73021423)');
+      await client.query('DELETE FROM onboarding_speech_budget WHERE expires_at < now()');
+      for(const [window,limit] of [['minute',8],['day',100]]){
+        const result=await client.query(`INSERT INTO onboarding_speech_budget(bucket,used,expires_at)
+          VALUES($1 || ':' || date_trunc($1,now())::text,1,date_trunc($1,now())+($2 || ' seconds')::interval)
+          ON CONFLICT(bucket) DO UPDATE SET used=onboarding_speech_budget.used+1
+          WHERE onboarding_speech_budget.used < $3 RETURNING used`,[window,window==='minute'?60:86400,limit]);
+        assert(result.rows.length,429,'ONBOARDING_SPEECH_LIMIT');
+      }
+    });
+    // Process in memory; this endpoint never writes recordings or answers to GCS/user records.
+    return {text:await ai.transcribe(req.body,mime)};
+  });
   app.post('/v1/auth/login',{config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async req=>{
     const body = z.object({username:text(64),password:z.string().min(1).max(128)}).strict().parse(req.body);
     return login(db,body.username,body.password);

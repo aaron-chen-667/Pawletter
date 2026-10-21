@@ -32,6 +32,21 @@ before(async()=>{
  for(const published of [true,false]){const r=await request(station,'POST','/v1/pets',{name:'吐司',profile:{species:'cat'},published});assert.equal(r.statusCode,201,r.body);if(published)pet=r.json().id;else privatePet=r.json().id;}
 });
 after(async()=>{await app?.close();await engine?.close();});
+test('anonymous onboarding speech validates audio and origin, limits shared spend and never stores media',async()=>{
+ const wav=Buffer.alloc(44);wav.write('RIFF');wav.write('WAVE',8);
+ const options={method:'POST',url:'/v1/onboarding/transcribe',headers:{origin:'https://pawletter-adoption-h5.chenaaron668.chatgpt.site','content-type':'audio/wav'},payload:wav};
+ const before=transcribeCalls,stored=blobs.size;
+ assert.equal((await app.inject({...options,headers:{...options.headers,origin:'https://wrong.invalid'}})).statusCode,403);
+ assert.equal((await app.inject({...options,payload:Buffer.from('not an audio file')})).statusCode,400);
+ assert.equal((await app.inject({...options,payload:Buffer.alloc(6*1024*1024+1)})).statusCode,413);
+ const result=await app.inject(options);assert.equal(result.statusCode,200,result.body);assert.equal(result.json().text,'平时喜欢玩逗猫棒。');
+ assert.equal(transcribeCalls,before+1);assert.equal(blobs.size,stored);
+ await db.query("UPDATE onboarding_speech_budget SET used=100 WHERE bucket LIKE 'day:%'");
+ const limited=await app.inject(options);assert.equal(limited.statusCode,429,limited.body);assert.equal(limited.json().error,'ONBOARDING_SPEECH_LIMIT');
+ assert.equal(transcribeCalls,before+1);
+ await db.query('DELETE FROM onboarding_speech_budget');
+ transcribeCalls=before;
+});
 test('health, CORS and authenticated endpoints',async()=>{
  assert.equal((await app.inject('/health')).statusCode,200);
  assert.equal((await app.inject('/v1/pets')).statusCode,401);

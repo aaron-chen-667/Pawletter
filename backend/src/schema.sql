@@ -1,6 +1,11 @@
 CREATE TABLE IF NOT EXISTS stations (
  id text PRIMARY KEY, name text NOT NULL
 );
+-- Anonymous onboarding speech has a shared, bounded budget across all instances.
+-- No audio, transcript, IP address or identity is stored in these counters.
+CREATE TABLE IF NOT EXISTS onboarding_speech_budget (
+ bucket text PRIMARY KEY, used integer NOT NULL, expires_at timestamptz NOT NULL
+);
 CREATE TABLE IF NOT EXISTS users (
  id text PRIMARY KEY, username text UNIQUE NOT NULL, password_hash text NOT NULL,
  role text NOT NULL CHECK (role IN ('adopter','station')),

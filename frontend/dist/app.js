@@ -8,20 +8,31 @@ import { communityView } from './community-ui.js';
 import { enrichCatalog, populateDefaultExamples, storyCards, createStory, STORY_STORAGE_KEY, STORY_MODE_KEY } from './samples.js';
 
 import { lifestyleQuestions, confirmLifestyle, beginRegistration, completeRegistration } from './lifestyle.js';
+import {createOnboardingSpeech} from './onboarding-speech.js';
+const lifestyleSpeech=createOnboardingSpeech();
+let lifestyleSpeechBusy=false,lifestyleSpeechError='',lifestyleSpeechArmed=false;
 
 let lifestyleStep=0,lifestyleText='',lifestyleValue='unknown',lifestyleReview=false,lifestyleViewing=false;
 const lifestyleOwner=()=>state.account||state.registrationDraft;
+const registrationExperience=new URL(location.href).searchParams.get('flow')==='register';
+const REGISTRATION_STORAGE_KEY='pawletter.registration.v1';
 let state;
 let storyMode=false;
 try {storyMode=sessionStorage.getItem(STORY_MODE_KEY)==='on';}catch{}
 try { const saved = JSON.parse(localStorage.getItem(storyMode?STORY_STORAGE_KEY:STORAGE_KEY)); state = saved?.version === 1 ? saved : freshState(); } catch { state = freshState(); }
 if(storyMode&&!state.sampleStory){storyMode=false;try{sessionStorage.removeItem(STORY_MODE_KEY);state=JSON.parse(localStorage.getItem(STORAGE_KEY))||freshState();}catch{state=freshState();}}
+if(registrationExperience){
+  storyMode=false;
+  try{const saved=JSON.parse(sessionStorage.getItem(REGISTRATION_STORAGE_KEY));state=saved?.version===1?saved:freshState();}catch{state=freshState();}
+  // Keep this onboarding session separate from the existing account and sample history.
+  state.defaultExamplesRevision=1;
+}
 initializeDiscovery(state);
 initializeCommunity(state);
 enrichCatalog(state);populateDefaultExamples(state);
 // Public browsing always starts as an adopter. Station access requires server login.
 state.role='user';
-let page = { name: state.role === 'rescue' ? 'work' : state.registrationDraft&&!state.account?'register':'meet' };
+let page = { name: state.role === 'rescue' ? 'work' : ((registrationExperience&&!state.signedOut)||state.registrationDraft)&&!state.account?'register':'meet' };
 let filter = 'all';
 let workFilter='all',animalFilter='all',animalSearch='';
 let observationResult=null,observationBusy=false,observationHold=false,observationFinishing=false,observationPetId=null,observationEditing=false;
@@ -57,7 +68,10 @@ const capture = createCaptureController({
       if(observationHold&&!observationFinishing&&!capture.media.voicePending&&!capture.media.voiceRecorder&&capture.media.audioUrl)queueMicrotask(()=>finishObservationHold());
       return;
     }
-    if(page.name==='lifestyle'){render();return;}
+    if(page.name==='lifestyle'){
+      if(lifestyleSpeechArmed&&!capture.media.voicePending&&!capture.media.voiceRecorder&&capture.media.audioUrl){lifestyleSpeechArmed=false;void transcribeLifestyle();}
+      render();return;
+    }
     if (page.name === 'intake' && capture.media.videoRecorder?.state === 'recording' && document.querySelector('.shutter.recording')) {
       document.querySelector('#capture-time').textContent = `00:${String(capture.media.recordingSeconds).padStart(2,'0')} / 00:30`;
       return;
@@ -105,7 +119,7 @@ function esc(value='') { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;
 function photo(p,cls='',extra='') { return `<img class="${cls}" src="${esc(p.image||'./assets/paw.svg')}" alt="${esc(p.name)}的照片" ${extra} />`; }
 function button(label,action,cls='button',value='',extra='') { return `<button class="${cls}" data-action="${action}" ${value?`data-value="${esc(value)}"`:''} ${extra}>${label}</button>`; }
 function save() {
-  try { localStorage.setItem(storyMode?STORY_STORAGE_KEY:STORAGE_KEY,JSON.stringify(state)); return true; }
+  try { const storage=registrationExperience?sessionStorage:localStorage;storage.setItem(registrationExperience?REGISTRATION_STORAGE_KEY:storyMode?STORY_STORAGE_KEY:STORAGE_KEY,JSON.stringify(state)); return true; }
   catch { toast('设备存储空间不足，本次修改暂留在当前页面；请减少上传素材。'); return false; }
 }
 function toast(message) {
@@ -121,6 +135,7 @@ function navigate(name,id) {
   if(name==='intake')capture.startCamera();
 }
 function leaveCapture(next) {
+  if(page.name==='lifestyle'&&next!=='lifestyle')resetLifestyleSpeech();
   if(page.name==='voice'&&next!=='voice'&&captureIntent.kind==='observation'){observationHold=false;observationPetId=null;}
   if(page.name==='intake'&&next!=='intake')capture.stopCamera();
   if((page.name==='voice'||page.name==='lifestyle')&&next!==page.name)capture.stopVoice();
@@ -228,17 +243,22 @@ function meetPage() {
   const list=discoveryItems();
   const hero=list[0];
   const nearby=state.discoveryMode==='nearby';
-  const stations=nearbyStations(state.location,state.radius);
-  return `${shellHeader()}<main class="main discover">
-    <div class="discovery-meta"><span>${state.location.source==='live'?'已定位':state.location.source==='manual'?'手动位置':'演示位置'} · ${stations.length} 家附近站点</span>${button('认识救助站 '+icon('arrow'),'stations','text-button')}</div>
-    <div class="intro-heading"><p class="eyebrow">REAL PAWS. REAL CONNECTION.</p><h1>${nearby?'你的附近，<br>有点<span class="orange">可爱。</span>':'下一张，<br>会不会<span class="orange">心动？</span>'}</h1><p>${nearby?'找个离你近的小伙伴，先 say hi。':'左滑换一位 · 右滑想认识'}</p><span class="intro-paw">${icon(nearby?'paw':'heart')}</span></div>
-    <div class="discovery-tabs">${button(icon('pin')+' 附近','discovery-mode',nearby?'active':'','nearby')}${button(icon('spark')+' 随缘遇见','discovery-mode',!nearby?'active':'','swipe')}</div>
-    <div class="filter-row" role="group" aria-label="筛选动物">${[['all','全部'],['cat','猫咪'],['dog','狗狗'],['saved','喜欢的']].map(([id,label])=>button(label,'filter',`filter-chip ${filter===id?'selected':''}`,id)).join('')}</div>
+  const saved=state.discoveryMode==='saved';
+  const opening=`${shellHeader()}<main class="main discover">
+
+    <div class="intro-heading ${saved?'saved-intro':nearby?'nearby-intro':'chance-intro'}"><p class="eyebrow">${saved?'SAVED WITH A LITTLE LOVE.':nearby?'REAL PAWS. REAL CONNECTION.':'A LITTLE CHANCE. A NEW FRIEND.'}</p><h1>${saved?'喜欢的它们，<br>都在<span class="orange">这里。</span>':nearby?'你的附近，<br>有点<span class="orange">可爱。</span>':'下一位心动，<br>刚好<span class="orange">是你。</span>'}</h1><p>${saved?'再看一眼，接着聊聊，把心动慢慢变熟悉。':nearby?'找个离你近的小伙伴，先 say hi。':'让缘分翻一页，和没见过的小可爱打个招呼。'}</p><span class="intro-paw" aria-hidden="true">${icon(saved?'heart':nearby?'paw':'spark')}</span></div>
+    <div class="discovery-tabs">${button(icon('pin')+' 附近','discovery-mode',nearby?'active':'','nearby')}${button(icon('spark')+' 随缘遇见','discovery-mode',!nearby&&!saved?'active':'','swipe')}${button(icon('heart')+' 喜欢的','discovery-mode',saved?'active':'','saved')}</div>
+    <div class="filter-row" role="group" aria-label="筛选动物">${[['all','全部'],['cat','猫咪'],['dog','狗狗']].map(([id,label])=>button(label,'filter',`filter-chip ${filter===id?'selected':''}`,id)).join('')}</div>`;
+  if(saved){
+    const favorites=state.following.map(id=>activePet(state,id)).filter(p=>p&&(filter==='all'||p.species===(filter==='cat'?'猫':'狗')));
+    return `${opening}<p class="saved-count">${favorites.length} 位喜欢的小伙伴</p><div class="saved-pet-list">${favorites.map(p=>`<article class="saved-pet-card"><button class="saved-pet-photo" data-action="profile" data-value="${p.id}" aria-label="查看${esc(p.name)}的档案">${photo(p,'','loading="lazy"')}</button><div class="saved-pet-info"><div class="saved-pet-name"><h2>${esc(p.name)}</h2>${button(icon('heart'),'follow','saved-pet-heart saved',p.id,`aria-label="取消喜欢${esc(p.name)}"`)}</div>${statusPill(p)}<p>${esc(p.age)} · ${esc(p.coat)} · ${esc(p.city)}</p><p class="saved-pet-mood">${esc(p.tags.slice(0,2).join(' · '))}</p><button class="saved-pet-station" data-action="station" data-value="${stationFor(p).id}">${icon('home')} ${esc(stationFor(p).name)} ${icon('chevron')}</button><div class="saved-pet-actions">${button('看档案','profile','button secondary',p.id)}${button(state.messages[p.id]?.length?'继续聊天':'打个招呼','chat','button primary',p.id)}</div></div></article>`).join('')||empty('还没有收藏的小伙伴','遇到心动的它，点一下爱心，下次就能在这里找到。',button('去随缘遇见','discovery-mode','button primary','swipe'))}</div></main>`;
+  }
+  return `${opening}
     ${hero?`<article class="hero-pet ${!nearby?'swipe-card':''}" ${!nearby?'id="swipe-card"':''} data-pet="${hero.pet.id}">
       ${!nearby?'<span class="swipe-stamp stamp-like">想认识</span><span class="swipe-stamp stamp-skip">下一位</span>':''}
       <button class="hero-image-button" data-action="profile" data-value="${hero.pet.id}" aria-label="了解${esc(hero.pet.name)}">${photo(hero.pet,'hero-image','fetchpriority="high"')}<span class="image-shade"></span><span class="hero-label">${icon('spark')} 和你有些合拍</span><span class="hero-caption"><span>${esc(hero.pet.name)} <small>${hero.pet.sex==='男孩子'?'♂':'♀'}</small></span><span class="hero-location">${esc(hero.pet.age)} · ${esc(hero.pet.city)}</span></span></button>
       ${button(icon('heart'),'follow',`save-button ${state.following.includes(hero.pet.id)?'saved':''}`,hero.pet.id,`aria-label="${state.following.includes(hero.pet.id)?'取消关注':'关注'}${esc(hero.pet.name)}"`)}
-      <div class="hero-content"><p class="pet-quote">“${esc(hero.pet.mood)}”</p><div class="tags">${hero.pet.tags.slice(0,2).map(t=>`<span>${esc(t)}</span>`).join('')}</div><button class="match-reason station-card-link" data-action="station" data-value="${stationFor(hero.pet).id}">${icon('home')} ${esc(stationFor(hero.pet).name)} · 约 ${distanceLabel(hero.distance)} ${icon('chevron')}</button>${nearby?button(`和${esc(hero.pet.name)}打个招呼 ${icon('arrow')}`,'chat','button primary full',hero.pet.id):button('先看看真实档案 '+icon('arrow'),'profile','deck-profile',hero.pet.id)}</div>
+      <div class="hero-content"><p class="pet-quote">“${esc(hero.pet.mood)}”</p><div class="tags">${hero.pet.tags.slice(0,2).map(t=>`<span>${esc(t)}</span>`).join('')}</div><button class="match-reason station-card-link station-origin" data-action="station" data-value="${stationFor(hero.pet).id}"><span class="station-origin-symbol">${icon('home')}</span><span class="station-origin-copy"><small>照顾我的救助站</small><strong>${esc(stationFor(hero.pet).name)}</strong></span><span class="station-origin-distance">约 ${distanceLabel(hero.distance)} ${icon('chevron')}</span></button>${nearby?button(`和${esc(hero.pet.name)}打个招呼 ${icon('arrow')}`,'chat','button primary full',hero.pet.id):button('先看看真实档案 '+icon('arrow'),'profile','deck-profile',hero.pet.id)}</div>
     </article>`:empty(nearby?'这个范围暂时没有合适的伙伴':'这一轮，先看到这里。',nearby?'可以调整位置和距离，或去随缘遇见。':'喜欢的都帮你记着，可以回看或重新刷一轮。',nearby?button('调整位置与距离','location','button secondary'):button('重新遇见','reset-deck','button secondary'))}
     ${!nearby?`<div class="swipe-actions">${button(icon('refresh'),'undo-swipe','swipe-undo','','aria-label="撤回上一次滑动" '+(!state.swipeHistory.length?'disabled':''))}${button(icon('close'),'swipe-skip','swipe-no',hero?.pet.id||'','aria-label="左滑，换一位" '+(!hero?'disabled':''))}${button(icon('heart'),'swipe-like','swipe-yes',hero?.pet.id||'','aria-label="右滑，想认识" '+(!hero?'disabled':''))}${button(icon('chat'),'chat','swipe-chat',hero?.pet.id||'','aria-label="直接聊聊" '+(!hero?'disabled':''))}</div><p class="swipe-caption">喜欢只是开始，领养前要认真了解彼此。</p>`:''}
     ${nearby&&list.length>1?`${sectionHeading('MORE FRIENDS NEARBY','附近还有它们')}<div class="pet-grid">${list.slice(1).map(({pet,distance})=>`<button class="small-pet" data-action="profile" data-value="${pet.id}"><div>${photo(pet,'','loading="lazy"')}<span>${pet.species==='猫'?'喵':'汪'}</span></div><strong>${esc(pet.name)} <small>约 ${distanceLabel(distance)}</small></strong><p>${esc(pet.tags[0])}</p></button>`).join('')}</div>`:''}
@@ -256,7 +276,8 @@ function messagesPage() {
 }
 function minePage() {
   const application=state.applications.find(a=>a.stage>=0),account=state.account;
-  return `${shellHeader()}<main class="main"><div class="personal-card"><span class="human-avatar">${esc(account?.nickname[0]||'你')}</span><div><p class="eyebrow">MY LITTLE WORLD</p><h1>${account?'你好，'+esc(account.nickname):'让相遇，有个开始。'}</h1><p>${account?'已完成演示注册 · 尚未真实核验':'先逛逛，准备领养时建立你的账号。'}</p></div></div>
+  const adopted=account?[...new Set(state.applications.filter(a=>a.stage===3&&a.adopterId===account.id).map(a=>a.petId))].map(id=>activePet(state,id)).filter(Boolean):[];
+  return `${shellHeader()}<main class="main"><div class="personal-card ${adopted.length?'has-pets':''}">${account?button('退出登录','logout','personal-logout'):'' }<div class="family-avatar-row"><span class="human-avatar">${esc(account?.nickname[0]||'你')}</span>${adopted.length?`<span class="family-plus" aria-hidden="true">+</span>${adopted.map(p=>`<button class="family-pet" data-action="chat" data-value="${p.id}" aria-label="和${esc(p.name)}的 Agent 聊天">${photo(p)}<span>${esc(p.name)}</span><small>AI 分身</small></button>`).join('')}`:''}</div><div class="personal-copy"><p class="eyebrow">MY LITTLE WORLD</p><h1>${account?'你好，'+esc(account.nickname):'让相遇，有个开始。'}</h1><p>${adopted.length?'你和 '+adopted.map(p=>esc(p.name)).join('、')+' 的小日子':account?'已完成演示注册 · 尚未真实核验':'先逛逛，准备领养时建立你的账号。'}</p></div></div>
     ${account?button('看看我的个人主页 '+icon('arrow'),'public-profile','button primary full'):button('注册领养账号 '+icon('arrow'),'register','button primary full')}
     <div class="stats-row"><div><b>${state.following.length}</b><span>喜欢的小伙伴</span></div><div><b>${state.memory.length}</b><span>偏好与记忆</span></div><div><b>${state.applications.filter(a=>a.stage>=0).length}</b><span>领养申请</span></div></div>
     <div class="menu-card">${menu('home','我的领养进度',application?activePet(state,application.petId)?.name+' · '+stages[application.stage]:'还没有提交申请','progress')}${menu('heart','救助站评价','0–5 星 · 定期回访与照护记录','ratings')}${menu('clock','生活画像与陪伴时间',account?.lifestyle?'已记录作息、空闲时间与领养预期 · 查看资料':account?'尚未记录 · 补充生活资料':'注册时通过语音对话建立画像','lifestyle')}${menu('shield','身份与领养公约','身份信息不在主页公开','account')}</div>
@@ -299,11 +320,13 @@ function memoryPage() {
 }
 function loadLifestyleStep(index) {
   if(!Number.isInteger(index)||index<0||index>=lifestyleQuestions.length)return;
+  resetLifestyleSpeech();
   capture.reset();lifestyleStep=index;lifestyleReview=false;lifestyleViewing=false;
   const answer=lifestyleOwner()?.lifestyleDraft?.[lifestyleQuestions[index].key];
   lifestyleText=answer?.text||'';lifestyleValue=answer?.value||'unknown';render();
 }
 function startLifestyle() {
+  resetLifestyleSpeech();
   const owner=lifestyleOwner();
   if(!owner){navigate('register');return;}
   if(state.role!=='user')return;
@@ -312,12 +335,27 @@ function startLifestyle() {
   lifestyleStep=0;lifestyleText=owner.lifestyleDraft.work?.text||'';lifestyleValue=owner.lifestyleDraft.work?.value||'unknown';
   capture.reset();navigate('lifestyle');
 }
+function resetLifestyleSpeech(){lifestyleSpeech.cancel();lifestyleSpeechBusy=false;lifestyleSpeechError='';lifestyleSpeechArmed=false;}
+async function transcribeLifestyle(){
+  if(lifestyleSpeechBusy||!capture.media.audioUrl)return;
+  lifestyleSpeechBusy=true;lifestyleSpeechError='';render();
+  const result=await lifestyleSpeech.transcribe(capture.media.audioUrl);
+  if(!result)return;
+  lifestyleSpeechBusy=false;
+  if(result.text){lifestyleText=result.text;toast('已经转成文字，请核对后继续');}else lifestyleSpeechError=result.error;
+  render();
+}
+async function recordLifestyle(){
+  if(lifestyleSpeechBusy)return;
+  if(capture.media.voiceRecorder){await capture.stopVoice();return;}
+  resetLifestyleSpeech();await capture.reset();lifestyleSpeechArmed=true;await capture.recordVoice();
+}
 function lifestylePage() {
   if(!lifestyleOwner())return '';
   const answers=(lifestyleViewing?state.account?.lifestyle?.answers:lifestyleOwner().lifestyleDraft)||{},q=lifestyleQuestions[lifestyleStep],m=capture.media;
   const registering=!state.account;
   if(lifestyleReview)return `${topbar(lifestyleViewing?'我的生活画像':'确认你的生活画像',lifestyleViewing?'以下是已经记录的信息，可重新对话修改':registering?'最后一步 · 确认后完成注册':'由你确认后，才会用于匹配')}<main class="main lifestyle-page"><div class="lifestyle-agent">${icon('spark')}<div><strong>我这样理解你的生活</strong><p>有不准确的地方随时改，不确定的内容可以保留。</p></div></div>${lifestyleQuestions.map((q,i)=>`<article class="lifestyle-answer"><h3>${esc(q.label)}</h3><p>${esc(answers[q.key]?.text||'尚未回答')}</p>${answers[q.key]?.audio?renderMedia([answers[q.key].audio]):''}<span>${esc(q.options.find(([v])=>v===answers[q.key]?.value)?.[1]||'还不确定')}</span>${lifestyleViewing?'':button('修改','lifestyle-edit','text-button',String(i))}</article>`).join('')}<p class="footnote">画像用于推荐，提交领养申请时会一并交给负责站点，不在个人主页公开。推荐结果仍需与站点共同确认。可以随时删除。</p>${lifestyleViewing?button(icon('mic')+' 重新对话修改','lifestyle-restart','button primary full'):button(registering?'确认画像，完成注册':'保存修改','lifestyle-confirm','button primary full')}${!registering?button('删除已保存画像','lifestyle-clear','text-button full spaced'):''}${!lifestyleViewing?button(registering?'返回公约，暂不注册':'暂不保存，返回我的','lifestyle-skip','text-button full spaced'):''}</main>`;
-  return `${topbar('让 Agent 认识你','先从你的日常开始 · '+(lifestyleStep+1)+' / 4')}<main class="main lifestyle-page"><div class="lifestyle-progress">${lifestyleQuestions.map((_,i)=>`<i class="${i<=lifestyleStep?'done':''}"></i>`).join('')}</div><div class="lifestyle-agent">${icon('spark')}<div><strong>领养小助手 · AI 助手</strong><p>先聊聊你的日常，再一起找到合适的小伙伴。</p></div></div>${lifestyleStep?`<div class="lifestyle-previous">${esc(answers[lifestyleQuestions[lifestyleStep-1].key]?.text||'')}</div>`:''}<div class="lifestyle-question"><h2>${esc(q.title)}</h2><p>${esc(q.hint)}</p></div><button class="lifestyle-mic ${m.voiceRecorder?'recording':''}" data-action="lifestyle-record" ${m.voicePending?'disabled':''}>${icon(m.voiceRecorder?'stop':'mic')}<span>${m.voiceRecorder?'点击结束录音 · '+m.audioSeconds+' 秒':m.voicePending?'正在打开麦克风':'点击说一段'}</span></button>${m.audioUrl?`<audio controls src="${m.audioUrl}"></audio>`:''}<p class="footnote">录音可回听，保存回答后会随画像保留，并在领养申请中交给负责站点。语音转写尚未接入，请补充文字或使用预设回答。</p>${button('使用预设回答','lifestyle-sample','text-button full')}<form id="lifestyle-answer-form" class="form-stack"><label>你的回答<textarea id="lifestyle-answer" name="answer" rows="3" required maxlength="500" placeholder="可以直接打字，或整理刚才说的内容">${esc(lifestyleText)}</textarea></label><label>确认这一项<select id="lifestyle-value" name="value">${q.options.map(([v,label])=>`<option value="${v}" ${v===lifestyleValue?'selected':''}>${label}</option>`).join('')}</select></label><button class="button primary full" type="submit" ${m.voiceRecorder||m.voicePending?'disabled':''}>${lifestyleStep===3?'看看整理好的画像':'说好了，继续聊'}</button></form>${button(registering?'返回公约，暂不注册':'暂不保存，返回我的','lifestyle-skip','text-button full spaced')}</main>`;
+  return `${topbar('让 Agent 认识你','先从你的日常开始 · '+(lifestyleStep+1)+' / 4')}<main class="main lifestyle-page"><div class="lifestyle-progress">${lifestyleQuestions.map((_,i)=>`<i class="${i<=lifestyleStep?'done':''}"></i>`).join('')}</div><div class="lifestyle-agent">${icon('spark')}<div><strong>领养小助手 · AI 助手</strong><p>先聊聊你的日常，再一起找到合适的小伙伴。</p></div></div>${lifestyleStep?`<div class="lifestyle-previous">${esc(answers[lifestyleQuestions[lifestyleStep-1].key]?.text||'')}</div>`:''}<div class="lifestyle-question"><h2>${esc(q.title)}</h2><p>${esc(q.hint)}</p></div><button class="lifestyle-mic ${m.voiceRecorder?'recording':''}" data-action="lifestyle-record" ${m.voicePending||lifestyleSpeechBusy?'disabled':''}>${icon(m.voiceRecorder?'stop':'mic')}<span>${m.voiceRecorder?'点击结束录音 · '+m.audioSeconds+' 秒':m.voicePending?'正在打开麦克风':lifestyleSpeechBusy?'正在转成文字…':'点击说一段'}</span></button>${m.audioUrl?`<audio controls src="${m.audioUrl}"></audio>`:''}<p class="footnote">录音结束后自动转成文字，最长 60 秒。录音会发送到语音服务用于转写；确认后的回答与录音保存在当前设备，提交申请时交给负责站点。</p>${lifestyleSpeechBusy?'<p role="status">正在听懂你的回答，请稍候…</p>':''}${lifestyleSpeechError?`<p class="form-error" role="alert">${esc(lifestyleSpeechError)}</p>${button('重新转写这段录音','lifestyle-transcribe','button secondary full')}`:''}${!lifestyleSpeechBusy?button('使用预设回答','lifestyle-sample','text-button full'):''}<form id="lifestyle-answer-form" class="form-stack"><label>你的回答<textarea ${lifestyleSpeechBusy?'disabled':''} id="lifestyle-answer" name="answer" rows="3" required maxlength="500" placeholder="可以直接打字，或整理刚才说的内容">${esc(lifestyleText)}</textarea></label><label>确认这一项<select id="lifestyle-value" name="value">${q.options.map(([v,label])=>`<option value="${v}" ${v===lifestyleValue?'selected':''}>${label}</option>`).join('')}</select></label><button class="button primary full" type="submit" ${m.voiceRecorder||m.voicePending||lifestyleSpeechBusy?'disabled':''}>${lifestyleStep===3?'看看整理好的画像':'说好了，继续聊'}</button></form>${button(registering?'返回公约，暂不注册':'暂不保存，返回我的','lifestyle-skip','text-button full spaced')}</main>`;
 }
 function applyPage() {
   const p=activePet(state,page.id); if(!p)return '';
@@ -548,6 +586,9 @@ function renderOverlay() {
   if(overlay.type==='identity') {
     title='切换身份';
     body=`<p class="modal-intro">选择你在这里的身份</p><div class="identity-options"><button class="identity-option selected" data-action="identity-adopter"><span class="identity-symbol">${icon('user')}</span><span><strong>领养者</strong><small>认识小伙伴，寻找适合的陪伴</small></span><span class="identity-current">当前</span></button><a class="identity-option" href="?mode=online&role=station"><span class="identity-symbol station">${icon('home')}</span><span><strong>救助站</strong><small>登录站点账号，管理宠物与资料</small></span>${icon('chevron')}</a></div>`;
+  } else if(overlay.type==='logout') {
+    title='退出当前账号？';
+    body=`<p class="modal-intro">退出后将返回未登录的领养者界面，当前账号的记录会保留在本机。</p><div class="logout-actions">${button('取消','close-modal','button secondary')}${button('确认退出','confirm-logout','button primary')}</div>`;
   } else if(overlay.type==='request-followup') {
     const a=state.applications.find(a=>a.id===overlay.id&&a.stage===3),pet=a&&activePet(state,a.petId);
     title='发起一次回访';
@@ -558,7 +599,7 @@ function renderOverlay() {
   } else if(overlay.type==='location') {
     title='在哪里遇见？';
     const stations=nearbyStations(state.location,state.radius);
-    body=`<p class="modal-intro">当前：${esc(state.location.label)} · ${state.location.source==='live'?'设备定位':state.location.source==='manual'?'手动选择':'演示位置'}</p>${button(icon('pin')+(locating?' 正在定位…':' 使用我的当前位置'),'locate','button primary full','',locating?'disabled':'')}<p class="footnote">定位只在本浏览器用于距离计算，不上传服务器。站点位置尚未完成实地核验。</p>${locationError?`<p class="location-error" role="status">${esc(locationError)}</p>`:''}<form id="location-form" class="form-stack"><div class="form-row"><label>也可以选择城市<select name="city">${Object.keys(cityLocations).map(city=>`<option ${state.location.label===city?'selected':''}>${city}</option>`).join('')}</select></label><label>附近范围<select name="radius">${[5,20,50,300].map(r=>`<option value="${r}" ${state.radius===r?'selected':''}>${r} km</option>`).join('')}</select></label></div><button class="button secondary full" type="submit">使用这个位置与范围</button></form>${sectionHeading('AROUND YOU',stations.length+' 家附近站点')}<div class="nearby-stations">${stations.length?stations.map(s=>`<article><span class="station-icon">${icon('home')}</span><div><strong>${esc(s.name)}</strong><p>${esc(s.city)} · ${esc(s.area)} · ${state.pets.filter(p=>stationFor(p).id===s.id&&p.status==='available'&&p.active).length} 位待领养伙伴</p></div><div class="nearby-station-actions"><small>约 ${distanceLabel(s.distance)}</small>${button('查看主页','station','text-button',s.id)}</div></article>`).join(''):'<p class="body-copy">附近暂无站点，可扩大范围或切换「随缘遇见」。</p>'}</div>`;
+      body=`<p class="modal-intro">当前：${esc(state.location.label)} · ${state.location.source==='live'?'设备定位':state.location.source==='manual'?'手动选择':'演示位置'}</p>${button(icon('pin')+(locating?' 正在定位…':' 使用我的当前位置'),'locate','button primary full','',locating?'disabled':'')}<p class="footnote">定位只在本浏览器用于距离计算，不上传服务器。站点位置尚未完成实地核验。</p>${locationError?`<p class="location-error" role="status">${esc(locationError)}</p>`:''}<form id="location-form" class="form-stack"><div class="form-row"><label>也可以选择城市<select name="city">${Object.keys(cityLocations).map(city=>`<option ${state.location.label===city?'selected':''}>${city}</option>`).join('')}</select></label><label>附近范围<select name="radius">${[5,20,50,300].map(r=>`<option value="${r}" ${state.radius===r?'selected':''}>${r} km</option>`).join('')}</select></label></div><button class="button secondary full" type="submit">使用这个位置与范围</button></form>${sectionHeading('AROUND YOU',stations.length+' 家附近站点')}<div class="nearby-stations">${stations.length?stations.map(s=>`<article><span class="station-icon">${icon('home')}</span><div><strong>${esc(s.name)}</strong><p>${esc(s.city)} · ${esc(s.area)} · ${state.pets.filter(p=>stationFor(p).id===s.id&&p.status==='available'&&p.active).length} 位待领养伙伴</p></div><div class="nearby-station-actions"><small>约 ${distanceLabel(s.distance)}</small>${button('查看主页','station','text-button',s.id)}</div></article>`).join(''):'<p class="body-copy">附近暂无站点，可扩大范围或切换「随缘遇见」。</p>'}</div>`;
   } else if(overlay.type==='chat-options') {
     const p=activePet(state,overlay.id),muted=state.muted.includes(p.id);
     title='与'+p.name+'的对话';
@@ -652,6 +693,18 @@ document.addEventListener('click',async event=>{
     case 'enter-story':await switchStory(value);break;
     case 'exit-story':await switchStory(null);break;
     case 'register':registrationReturn=null;navigate('register');break;
+    case 'logout':if(state.account)openOverlay('logout');break;
+    case 'confirm-logout':{
+      if(!state.account)break;
+      const before=state,storage=registrationExperience?sessionStorage:localStorage,key=registrationExperience?REGISTRATION_STORAGE_KEY:storyMode?STORY_STORAGE_KEY:STORAGE_KEY;
+      try{storage.setItem(key+'.signed-out',JSON.stringify(before));}catch{toast('暂时无法保留记录，请稍后再退出。');break;}
+      resetLifestyleSpeech();await capture.reset();
+      state=freshState();state.defaultExamplesRevision=1;state.signedOut=true;
+      initializeDiscovery(state);initializeCommunity(state);enrichCatalog(state);
+      if(!save()){state=before;render();break;}
+      registrationReturn=null;draft={photos:[],description:'',sample:false};filter='all';
+      navigate('meet');navigationStack=[];toast('已退出当前账号');break;
+    }
     case 'account':case 'station-onboarding':case 'stations':case 'public-profile':case 'ratings':navigate(action,value);break;
     case 'station':navigate('station',value);break;
     case 'unpublish-moment':{if(state.role!=='user')break;const f=state.followups.find(f=>f.id===value&&f.adopterId===state.account?.id);if(f){f.publication={...f.publication,allowed:false,withdrawnAt:Date.now()};save();render();toast('已撤下主页展示，站点回访记录保留');}break;}
@@ -660,7 +713,7 @@ document.addEventListener('click',async event=>{
     case 'filter':filter=value;render();break;
     case 'location':openOverlay('location');break;
     case 'locate':locateUser();break;
-    case 'discovery-mode':state.discoveryMode=value;save();render();break;
+    case 'discovery-mode':if(['nearby','swipe','saved'].includes(value)){state.discoveryMode=value;filter='all';save();render();}break;
     case 'swipe-skip':swipePet(value,false);break;
     case 'swipe-like':swipePet(value,true);break;
     case 'undo-swipe':{
@@ -673,7 +726,7 @@ document.addEventListener('click',async event=>{
     case 'profile':navigate('profile',value);break;
     case 'chat':openChat(value);break;
     case 'follow':state.following=state.following.includes(value)?state.following.filter(id=>id!==value):[...state.following,value];save();render();break;
-    case 'saved':filter='saved';state.discoveryMode='swipe';save();navigate('meet');break;
+    case 'saved':filter='all';state.discoveryMode='saved';save();navigate('meet');break;
     case 'demo':openOverlay('demo');break;
     case 'chat-options':openOverlay('chat-options',value);break;
     case 'role':setRole(value);break;
@@ -717,7 +770,8 @@ document.addEventListener('click',async event=>{
     }
     case 'lifestyle':startLifestyle();break;
     case 'lifestyle-restart':state.account.lifestyleDraft=structuredClone(state.account.lifestyle?.answers||{});loadLifestyleStep(0);break;
-    case 'lifestyle-record':capture.recordVoice();break;
+    case 'lifestyle-record':await recordLifestyle();break;
+    case 'lifestyle-transcribe':await transcribeLifestyle();break;
     case 'lifestyle-sample':{const q=lifestyleQuestions[lifestyleStep];lifestyleText=q.sample;lifestyleValue=q.value;render();break;}
     case 'lifestyle-review':lifestyleReview=true;render();break;
     case 'lifestyle-edit':loadLifestyleStep(Number(value));break;
@@ -782,7 +836,9 @@ document.addEventListener('submit',async event=>{
     await archiveObservation(text,captureIntent.petId,observationResult?.batchId);return;
   }
   if(form.id==='lifestyle-answer-form'){
+    if(lifestyleSpeechBusy||capture.media.voiceRecorder||capture.media.voicePending)return;
     const text=String(data.get('answer')||'').trim(),value=String(data.get('value'));
+    if(text.length>500){toast('这一段超过 500 字，请精简后继续。');return;}
     if(!text||!lifestyleOwner())return;
     const submit=form.querySelector('button[type=submit]');submit.disabled=true;
     let audio;

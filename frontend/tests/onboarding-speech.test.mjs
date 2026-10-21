@@ -13,7 +13,7 @@ test('speech uploads actual audio, reports failures and can retry the same recor
 });
 test('leaving a question discards its late transcription',async()=>{
  let resolve,started;const ready=new Promise(r=>started=r);
- const speech=createOnboardingSpeech(async url=>url==='blob:recording'?{blob:async()=>new Blob(['a'])}:new Promise(r=>{resolve=r;started();}));
+ const speech=createOnboardingSpeech(async url=>url==='blob:recording'?{blob:async()=>new Blob(['a'],{type:'audio/wav'})}:new Promise(r=>{resolve=r;started();}));
  const request=speech.transcribe('blob:recording');await ready;speech.cancel();
  resolve({ok:true,json:async()=>({text:'旧问题的回答'})});assert.equal(await request,null);
 });

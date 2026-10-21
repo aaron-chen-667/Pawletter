@@ -1,13 +1,16 @@
+import {prepareSpeechAudio} from './audio-upload.js';
 const API='https://pawletter-api-446222711695.asia-east1.run.app';
-export function createOnboardingSpeech(fetcher=fetch){
+export function createOnboardingSpeech(fetcher=fetch,prepareAudio=prepareSpeechAudio){
  let generation=0,controller;
  function cancel(){generation++;controller?.abort();}
  async function transcribe(audioUrl){
   cancel();const current=generation;controller=new AbortController();const activeController=controller,signal=controller.signal;
   const timeout=setTimeout(()=>activeController.abort(),70000);
   try{
-   const blob=await (await fetcher(audioUrl,{signal})).blob();
-   if(blob.size>6*1024*1024)throw new Error('录音太大，请缩短后重新说一段。');
+   const original=await (await fetcher(audioUrl,{signal})).blob();
+   if(original.size>6*1024*1024)throw new Error('录音太大，请缩短后重新说一段。');
+   const blob=await prepareAudio(original);
+   if(current!==generation)return null;
    const response=await fetcher(`${API}/v1/onboarding/transcribe`,{method:'POST',body:blob,signal,headers:{'Content-Type':blob.type.split(';')[0]}});
    if(!response.ok){
     let data={};try{data=await response.json();}catch{}

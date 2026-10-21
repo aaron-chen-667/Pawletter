@@ -1,5 +1,5 @@
 export function petShareData(pet,href=location.href){
- const url=new URL(href);url.search='';url.hash='';url.searchParams.set('pet',pet.id);
+ const url=new URL(href),example=url.searchParams.get('examples')==='1';url.search='';url.hash='';if(example)url.searchParams.set('examples','1');url.searchParams.set('pet',pet.id);
  return {title:pet.name+' · 爪爪来信',text:'来认识'+pet.name+'，看看救助者为它记录的故事。',url:url.href};
 }
 export async function sharePet(data,platform=navigator){

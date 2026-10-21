@@ -15,22 +15,26 @@ import {createPressToTalk} from './press-to-talk.js';
 import {petJourneyMessage} from './pet-voice.js';
 import {cloudPet} from './cloud-pets.js';
 import {petShareData,sharePet} from './pet-share.js';
+import {EXAMPLES_KEY,exampleAnswers,exampleScenes,createAdopterExamples,createExampleAccount} from './adopter-examples.js';
+const exampleMode=new URL(location.href).searchParams.get('examples')==='1';
 const lifestyleSpeech=createOnboardingSpeech();
 let lifestyleSpeechBusy=false,lifestyleSpeechError='',lifestyleSpeechArmed=false;
 
 let lifestyleStep=0,lifestyleText='',lifestyleValue='unknown',lifestyleReview=false,lifestyleViewing=false;
 const lifestyleOwner=()=>state.account||state.registrationDraft;
-const accountApi=createAdopterAccount();
+const accountApi=exampleMode?createExampleAccount(()=>state):createAdopterAccount();
 let authRestoring=accountApi.hasSession(),authBusy=false,registrationCredentials=null,registrationKey=null,pendingAction=null;
 let interviewEpoch=0,interviewReply='',interviewAnalysis=null,applicationNote='';
 let applicationReview=false,applicationKey=null,applicationBusy=false,applicationError='';
 let catalogRows=[],catalogBusy=true,catalogError='',chatBusy=false,chatError='',chatEpoch=0;
 let initialPetId=new URL(location.href).searchParams.get('pet');
-let storyMode=false;
+let storyMode=exampleMode;
 function guestState(){const value=freshState();value.defaultExamplesRevision=1;value.memory=[];value.consent=true;initializeDiscovery(value);value.location.source='default';initializeCommunity(value);value.pets=catalogRows.map(cloudPet);value.role='user';return value;}
-let state=guestState();
+let state=exampleMode?createAdopterExamples():guestState();
+if(exampleMode){try{const saved=JSON.parse(sessionStorage.getItem(EXAMPLES_KEY));if(saved?.exampleData&&saved.exampleVersion===1)state=saved;}catch{}catalogBusy=false;}
 let page={name:'meet'};
 function acceptAccount(profile){
+ if(exampleMode){state.account=profile;registrationCredentials=null;registrationKey=null;save();return;}
  let saved;try{saved=JSON.parse(sessionStorage.getItem('pawletter.user.'+profile.id));}catch{}
  state=guestState();
  if(saved?.version===1){for(const key of ['following','messages','muted','read','memory','passed','swipeHistory','discoveryMode','location','radius','applicationDrafts'])if(saved[key]!==undefined)state[key]=saved[key];}
@@ -142,6 +146,7 @@ function esc(value='') { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;
 function photo(p,cls='',extra='') { return `<img class="${cls}" src="${esc(p.image||'./assets/paw.svg')}" alt="${esc(p.name)}的照片" ${extra} />`; }
 function button(label,action,cls='button',value='',extra='') { return `<button class="${cls}" data-action="${action}" ${value?`data-value="${esc(value)}"`:''} ${extra}>${label}</button>`; }
 function save() {
+ if(exampleMode){try{sessionStorage.setItem(EXAMPLES_KEY,JSON.stringify({...state,exampleVersion:1}));return true;}catch{return false;}}
  if(!state.account)return true;
  try{const saved={version:1};for(const key of ['following','messages','muted','read','memory','passed','swipeHistory','discoveryMode','location','radius','applicationDrafts'])saved[key]=state[key];sessionStorage.setItem('pawletter.user.'+state.account.id,JSON.stringify(saved));return true;}
  catch{toast('当前设备暂时无法保存浏览记录。');return false;}
@@ -192,7 +197,7 @@ function render() {
   switch(page.name) {
     case 'stories':body=storiesPage();break;
     case 'adopter-login':body=loginView({topbar,button});break;
-    case 'stations':case 'station':body=cloudStationPage(page.id);break;
+    case 'stations':case 'station':body=exampleMode?communityView(page.name,page.id,{state,topbar,esc,icon,button,menu,photo,sectionHeading,renderMedia,empty}):cloudStationPage(page.id);break;
     case 'register':case 'account':case 'station-onboarding':case 'public-profile':case 'ratings':
       body=communityView(page.name,page.id,{state,topbar,esc,icon,button,menu,photo,sectionHeading,renderMedia,empty});break;
     case 'meet': body=meetPage(); break;
@@ -218,7 +223,14 @@ function render() {
     case 'followup':body=followupPage();break;
     default:body=meetPage();
   }
-  app.innerHTML=`<aside class="desktop-note"><a class="desktop-brand" href="#/">${icon('paw')} PAWLETTER</a><p class="editorial">把相遇，<br>写成回家。</p><p class="desktop-description">一封来自毛茸茸世界的来信。<br>认识它，了解它，然后一起回家。</p><span class="desktop-label">公益领养 · 让陪伴发生</span><div class="desktop-line"></div><p class="desktop-foot">每一个小小的生命，<br>都值得被认真认识。</p></aside><div class="phone-app ${page.name==='chat'?'chat-app':page.name==='lifestyle'&&!lifestyleReview?'interview-app':''}">${body}${rootPages.includes(page.name)?nav():''}</div><aside class="desktop-right"><span>01 / MEET A NEW FRIEND</span><p>让喜欢，<br>有一个真实的去处。</p><button data-action="identity">切换身份 ${icon('arrow')}</button><img class="desktop-qr" src="./assets/qr.png" alt="手机扫码访问" /><small>手机扫码体验</small></aside>`;
+  if(exampleMode)body=`<div class="example-toolbar"><button data-action="example-scenes">${icon('book')} 示例体验 <span>切换场景</span></button><a href="./">返回正式</a></div>`+body;
+  else if(rootPages.includes(page.name))body=body.replace('</header>','</header><a class="example-launch" href="?examples=1"><span>想先看看完整的领养故事？</span><strong>浏览示例 '+icon('arrow')+'</strong></a>');
+  app.innerHTML=`<aside class="desktop-note"><a class="desktop-brand" href="#/">${icon('paw')} PAWLETTER</a><p class="editorial">把相遇，<br>写成回家。</p><p class="desktop-description">一封来自毛茸茸世界的来信。<br>认识它，了解它，然后一起回家。</p><span class="desktop-label">公益领养 · 让陪伴发生</span><div class="desktop-line"></div><p class="desktop-foot">每一个小小的生命，<br>都值得被认真认识。</p></aside><div class="phone-app ${exampleMode?'example-app ':''}${page.name==='chat'?'chat-app':page.name==='lifestyle'&&!lifestyleReview?'interview-app':''}">${body}${rootPages.includes(page.name)?nav():''}</div><aside class="desktop-right"><span>01 / MEET A NEW FRIEND</span><p>让喜欢，<br>有一个真实的去处。</p><button data-action="identity">切换身份 ${icon('arrow')}</button><img class="desktop-qr" src="./assets/qr.png" alt="手机扫码访问" /><small>手机扫码体验</small></aside>`;
+  if(exampleMode){
+   const composer=app.querySelector('.interview-composer');if(composer)composer.insertAdjacentHTML('afterbegin',button('用一句示例回答体验','example-answer','example-fill','','type="button"'));
+   const apply=app.querySelector('#application-form');if(apply)apply.insertAdjacentHTML('afterbegin',button('填入示例补充','example-application','example-fill','','type="button"'));
+   const register=app.querySelector('#register-form');if(register)register.insertAdjacentHTML('afterbegin','<p class="example-note">此处仅体验注册流程，不创建真实账号。请使用示例资料。</p>'+button('填入示例资料','example-registration','example-fill','','type="button"'));
+  }
   app.querySelector('.phone-app').classList.toggle('capture-app',page.name==='intake');
   app.querySelector('.phone-app').classList.toggle('discovery-app',page.name==='meet');
   app.querySelector('.phone-app').classList.toggle('story-mode',storyMode);
@@ -294,10 +306,10 @@ function meetPage() {
 }
 function messagesPage() {
   const entries=Object.entries(state.messages).filter(([,m])=>m.length).sort((a,b)=>b[1].at(-1).at-a[1].at(-1).at);
-  return `${shellHeader()}<main class="main"><div class="page-title"><p class="eyebrow">LETTERS FOR YOU</p><h1>有人想认识你<span class="orange">。</span></h1><p>小小的招呼，也许是很长的陪伴。</p></div>
+  return `${shellHeader()}<main class="main messages-page"><section class="messages-guide"><h1>宠物来信 <span>先聊聊，再决定</span></h1><p>和宠物 AI 分身聊习惯、喜好与照护。想进一步认识它，就发起领养申请。</p></section>
     ${requestsView()}
-    <div class="consent-card">${icon('spark')}<div><strong>${state.consent===true?'允许小家伙主动打招呼':state.consent===false?'主动招呼已暂停':'收一封来自它的来信？'}</strong><p>根据你的偏好认识彼此，随时可以关闭。</p></div>${button(state.consent===true?'已开启':'开启','consent',`small-button ${state.consent===true?'muted-button':''}`,state.consent===true?'off':'on')}</div>
-    ${entries.length?`<div class="message-list">${entries.map(([id,messages])=>{ const p=activePet(state,id);if(!p)return''; const last=messages.at(-1);const unread=last.from==='pet'&&last.at>(state.read[id]||0);return `<button class="message-item" data-action="chat" data-value="${id}"><div class="avatar-wrap">${photo(p,'avatar')}${unread?'<i></i>':''}</div><div class="message-preview"><div><strong>${esc(p.name)}</strong><span class="agent-tag">AI 分身</span><time>${state.sampleStory?'最近':'刚刚'}</time></div><p>${esc(last.text)}</p><small>${p.status==='adopted'?'一起生活的第 '+state.day+' 天':state.muted.includes(id)?'主动联系已暂停':unread?'给你发来一声招呼':'正在慢慢了解彼此'}</small></div>${icon('chevron')}</button>`;}).join('')}</div>`:empty('每一个头像背后，都是一个值得被认真认识的小生命','开启主动招呼，或去遇见一位新朋友。',button('去遇见','nav','button secondary','meet'))}
+    <div class="consent-card">${icon('spark')}<div><strong>${state.consent===true?'接收宠物分身的招呼':state.consent===false?'主动招呼已暂停':'接收宠物分身的招呼'}</strong><p>按你的偏好推荐，点击开关可暂停。</p></div>${button(state.consent===true?'已开启':'开启','consent',`small-button ${state.consent===true?'muted-button':''}`,state.consent===true?'off':'on')}</div>
+    ${entries.length?`<div class="message-list">${entries.map(([id,messages])=>{ const p=activePet(state,id);if(!p)return''; const last=messages.at(-1);const unread=last.from==='pet'&&last.at>(state.read[id]||0);return `<button class="message-item" data-action="chat" data-value="${id}"><div class="avatar-wrap">${photo(p,'avatar')}${unread?'<i></i>':''}</div><div class="message-preview"><div><strong>${esc(p.name)}</strong><span class="agent-tag">AI 分身</span><time>${state.sampleStory?'最近':'刚刚'}</time></div><p>${esc(last.text)}</p><small>${p.status==='adopted'?'一起生活的第 '+state.day+' 天':state.muted.includes(id)?'主动联系已暂停':unread?'给你发来一声招呼':'正在慢慢了解彼此'}</small></div>${icon('chevron')}</button>`;}).join('')}</div>`:empty('还没有开始聊天','去「遇见」选一只宠物，点击「聊一聊」。它的 AI 分身会根据救助档案回答你的问题。',button('去遇见宠物 '+icon('arrow'),'nav','button primary','meet'))}
 
 
   </main>`;
@@ -363,6 +375,7 @@ function startLifestyle(){
  interviewAnalysis=owner.lifestyle?.analysis||null;lifestyleStep=0;lifestyleText='';interviewReply='';capture.reset();navigate('lifestyle');
 }
 async function transcribeLifestyle(){
+ if(exampleMode){toast('示例访谈使用预设回答；真实语音请返回正式界面体验。');return;}
  if(lifestyleSpeechBusy||!capture.media.audioUrl)return;
  const current=interviewEpoch,context=page.name;lifestyleSpeechBusy=true;lifestyleSpeechError='';render();
  const result=await lifestyleSpeech.transcribe(capture.media.audioUrl);if(!result||current!==interviewEpoch)return;
@@ -398,7 +411,7 @@ async function confirmAccount(){
   const lifestyle={answers:lifestyleOwner().lifestyleDraft,analysis:interviewAnalysis};
   const profile=registering?await accountApi.register({...registrationCredentials,lifestyle},registrationKey):await accountApi.saveLifestyle(lifestyle);
   if(registering){acceptAccount(profile);resumeAccount();}else{state.account=profile;navigate('mine');}
-  toast(registering?'账号已创建，实名待核验':'生活画像已保存');
+  toast(exampleMode?'示例体验已保存，未创建真实账号。':registering?'账号已创建，实名待核验':'生活画像已保存');
  }catch(e){lifestyleSpeechError=e.message;}finally{authBusy=false;render();}
 }
 function lifestylePage(){
@@ -635,7 +648,9 @@ function renderOverlay() {
   if(!overlay) {overlayRoot.innerHTML=''; document.body.classList.remove('modal-open');return;}
   document.body.classList.add('modal-open');
   let title='',body='';
-  if(overlay.type==='registration-gate'){title='请先注册，继续认识它';body=`<p class="modal-intro">建立你的账号，保存喜欢的小伙伴、和它的 AI 分身聊天，也让救助站了解你的照护安排。</p><div class="logout-actions">${button('再逛逛','close-modal','button secondary')}${button('前往注册','register','button primary')}</div>${button('已有账号，去登录','adopter-login','text-button full spaced')}`;
+  if(overlay.type==='example-scenes'){
+    title='领养者场景示例';body=`<p class="modal-intro">宠物、人物和记录均为虚构示例，配图用于展示。聊天采用预设回应，操作只保存在当前标签页，不会提交真实申请。</p><div class="example-scene-grid">${exampleScenes.map(([id,title,desc,petId])=>`<button data-action="example-scene" data-value="${id}"><img src="${esc(state.pets.find(p=>p.id===petId)?.image||'./assets/orange.jpg')}" alt=""><span><strong>${title}</strong><small>${desc}</small></span>${icon('chevron')}</button>`).join('')}</div>${button('重置本页示例记录','example-reset','text-button full spaced')}<a class="button secondary full" href="./">返回正式界面</a>`;
+  } else if(overlay.type==='registration-gate'){title='请先注册，继续认识它';body=`<p class="modal-intro">建立你的账号，保存喜欢的小伙伴、和它的 AI 分身聊天，也让救助站了解你的照护安排。</p><div class="logout-actions">${button('再逛逛','close-modal','button secondary')}${button('前往注册','register','button primary')}</div>${button('已有账号，去登录','adopter-login','text-button full spaced')}`;
   } else if(overlay.type==='pet-share') {
     const p=state.pets.find(p=>p.id===overlay.id);title='分享'+(p?.name||'宠物档案');
     body=p?`<p class="modal-intro">复制下面的链接，让朋友也来认识它。</p><input class="share-link" aria-label="宠物分享链接" readonly value="${esc(petShareData(p).url)}" onclick="this.select()">${button('完成','close-modal','button secondary full spaced')}`:'';
@@ -643,8 +658,8 @@ function renderOverlay() {
     title='切换身份';
     body=`<p class="modal-intro">选择你在这里的身份</p><div class="identity-options"><button class="identity-option selected" data-action="identity-adopter"><span class="identity-symbol">${icon('user')}</span><span><strong>领养者</strong><small>认识小伙伴，寻找适合的陪伴</small></span><span class="identity-current">当前</span></button><a class="identity-option" href="?mode=online&role=station"><span class="identity-symbol station">${icon('home')}</span><span><strong>救助站</strong><small>登录站点账号，管理宠物与资料</small></span>${icon('chevron')}</a></div>`;
   } else if(overlay.type==='logout') {
-    title='退出当前账号？';
-    body=`<p class="modal-intro">退出后将返回未登录的领养者界面，账号与已确认的生活画像保存在服务器，退出后本页不再显示个人资料。</p><div class="logout-actions">${button('取消','close-modal','button secondary')}${button('确认退出','confirm-logout','button primary')}</div>`;
+    title=exampleMode?'退出示例体验？':'退出当前账号？';
+    body=`<p class="modal-intro">${exampleMode?'返回正式领养者界面，真实账号登录状态保持不变。':'退出后将返回未登录的领养者界面，账号与已确认的生活画像保存在服务器，退出后本页不再显示个人资料。'}</p><div class="logout-actions">${button('取消','close-modal','button secondary')}${button('确认退出','confirm-logout','button primary')}</div>`;
   } else if(overlay.type==='request-followup') {
     const a=state.applications.find(a=>a.id===overlay.id&&a.stage===3),pet=a&&activePet(state,a.petId);
     title='发起一次回访';
@@ -708,6 +723,7 @@ async function sendChat(text){
  finally{if(ticket===chatEpoch){chatBusy=false;if(page.name==='chat'&&page.id===p.id)render();}}
 }
 async function loadCatalog(){
+ if(exampleMode){catalogBusy=false;if(initialPetId){const id=initialPetId;initialPetId=null;if(state.pets.some(p=>p.id===id))navigate('profile',id);}render();return;}
  catalogBusy=true;catalogError='';
  try{const result=await accountApi.catalog();catalogRows=result.pets;state.pets=catalogRows.map(cloudPet);if(state.account&&state.consent)greet(state);
   if(initialPetId){const id=initialPetId;initialPetId=null;if(state.pets.some(p=>p.id===id))navigate('profile',id);else toast('这份宠物档案暂未公开或已下架，可以看看其他小伙伴。');}
@@ -731,6 +747,21 @@ document.addEventListener('click',async event=>{
   const {action,value}=target.dataset;
   if(!state.account&&['follow','chat','apply','swipe-like','consent','memory','progress','ratings','lifestyle','saved'].includes(action)){registrationGate(action,value);return;}
   switch(action) {
+    case 'example-scenes':if(exampleMode)openOverlay('example-scenes');break;
+    case 'example-reset':if(exampleMode){state=createAdopterExamples();save();navigate('meet');toast('示例已重置，正式资料未改变。');}break;
+    case 'example-scene':{
+      if(!exampleMode)break;const scene=exampleScenes.find(s=>s[0]===value);if(!scene)break;
+      if(!state.account)state.account=createAdopterExamples().account;
+      if(value==='register'){state.account=null;state.registrationDraft=null;navigate('register');}
+      else if(value==='saved'){state.discoveryMode='saved';navigate('meet');}
+      else if(value==='lifestyle')startLifestyle();
+      else if(value==='apply'){applicationReview=false;applicationNote=state.applicationDrafts?.ash?.note||'家里已封窗，家人同意领养，希望了解它的照护安排。';navigate('apply','ash');}
+      else navigate(value,value==='followup'?'rice':undefined);
+      break;
+    }
+    case 'example-answer':if(exampleMode)await sendInterviewAnswer(exampleAnswers[lifestyleQuestions[lifestyleStep].key].text);break;
+    case 'example-application':if(exampleMode){applicationNote='家里已经封窗，家人同意领养。工作日白天上班，晚上有时间陪伴，家人可以分担照护。想先了解它的饮食和适应情况。';render();}break;
+    case 'example-registration':if(exampleMode){const form=document.querySelector('#register-form');for(const [key,value] of Object.entries({nickname:'小禾',username:'example_xiaohe',password:'example-only-1234',realName:'示例用户',phone:'00000000000',email:'xiaohe@example.com'})){if(form.elements[key])form.elements[key].value=value;}form.elements.covenant.checked=true;form.elements.privacy.checked=true;}break;
     case 'share-pet':{
       const p=state.pets.find(p=>p.id===value);if(!p)break;target.disabled=true;
       try{const result=await sharePet(petShareData(p));if(result==='copied')toast('宠物链接已复制，可以分享给朋友');else if(result==='manual')openOverlay('pet-share',p.id);}finally{target.disabled=false;}break;
@@ -767,6 +798,7 @@ document.addEventListener('click',async event=>{
     case 'adopter-login':navigate('adopter-login');break;
     case 'logout':if(state.account)openOverlay('logout');break;
     case 'confirm-logout':{
+      if(exampleMode){location.assign('./');break;}
       if(!state.account||authBusy)break;authBusy=true;target.disabled=true;
       try{await accountApi.logout();save();resetLifestyleSpeech();voiceChat.cancel();chatEpoch++;chatBusy=false;await capture.reset();state=guestState();registrationCredentials=null;registrationKey=null;pendingAction=null;draft={photos:[],description:'',sample:false};navigate('meet');navigationStack=[];toast('已退出登录');}catch(e){toast(e.message);target.disabled=false;}finally{authBusy=false;}break;
     }
@@ -941,7 +973,7 @@ document.addEventListener('submit',async event=>{
 
   if(form.id==='application-confirm-form'){
     if(!state.account||applicationBusy||!data.has('shareProfile'))return;applicationBusy=true;applicationError='';render();
-    try{const result=await accountApi.apply(page.id,{note:applicationNote,memories:state.memory.map(m=>m.text),shareProfile:true},applicationKey);state.applications.unshift(result);delete state.applicationDrafts?.[page.id];save();navigate('progress',result.id);toast('申请已交给负责救助站');}
+    try{const result=await accountApi.apply(page.id,{note:applicationNote,memories:state.memory.map(m=>m.text),shareProfile:true},applicationKey);state.applications.unshift(result);delete state.applicationDrafts?.[page.id];save();navigate('progress',result.id);toast(exampleMode?'示例申请已保存，没有发送给真实救助站。':'申请已交给负责救助站');}
     catch(e){applicationError=e.message;}finally{applicationBusy=false;render();}return;
   }
   if(form.id==='confirm-form') {
@@ -1127,12 +1159,13 @@ async function switchStory(){toast("请使用你的领养者账号或救助站�
 let voicePointer=null;
 document.addEventListener('pointerdown',event=>{
  const button=event.target.closest('#interview-hold,#application-hold');if(!button||button.disabled||voicePointer!==null||event.button>0)return;
+ if(exampleMode){event.preventDefault();toast('示例访谈可以使用预设回答或文字；真实语音请返回正式界面。');return;}
  event.preventDefault();voicePointer=event.pointerId;voiceChat.start(event.clientY);
 });
 document.addEventListener('pointermove',event=>{if(event.pointerId===voicePointer)voiceChat.move(event.clientY);});
 document.addEventListener('pointerup',event=>{if(event.pointerId===voicePointer){voicePointer=null;voiceChat.end();}});
 document.addEventListener('pointercancel',event=>{if(event.pointerId===voicePointer){voicePointer=null;voiceChat.end(true);}});
-document.addEventListener('keydown',event=>{if(event.target.matches('#interview-hold,#application-hold')&&[' ','Enter'].includes(event.key)&&!event.repeat){event.preventDefault();voiceChat.start(0);}if(event.key==='Escape'&&voiceChat.state.holding)voiceChat.end(true);});
+document.addEventListener('keydown',event=>{if(event.target.matches('#interview-hold,#application-hold')&&[' ','Enter'].includes(event.key)&&!event.repeat){event.preventDefault();if(exampleMode){toast('示例访谈请使用预设回答或文字。');return;}voiceChat.start(0);}if(event.key==='Escape'&&voiceChat.state.holding)voiceChat.end(true);});
 document.addEventListener('keyup',event=>{if(event.target.matches('#interview-hold,#application-hold')&&[' ','Enter'].includes(event.key)){event.preventDefault();voiceChat.end();}});
 document.addEventListener('input',event=>{if(event.target.id==='application-note')applicationNote=event.target.value;});
 window.addEventListener('blur',()=>{voicePointer=null;if(voiceChat.state.holding)voiceChat.end(true);});

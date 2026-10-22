@@ -22,6 +22,7 @@ export function createPawletterClient(baseUrl, fetcher=fetch) {
     async intake(id){const data=await call(`/v1/pets/${encodeURIComponent(id)}/intake`);await Promise.all((data.visuals||[]).map(async v=>v.url=await visual(v.url)));return data;},
     createPet:body=>call('/v1/pets',{method:'POST',body}),
     updatePet:(id,body)=>call(`/v1/pets/${encodeURIComponent(id)}/profile`,{method:'POST',body}),
+    async setVisibility(id,published){const pet=await call(`/v1/pets/${encodeURIComponent(id)}`);const {adopted,...profile}=pet.profile;return call(`/v1/pets/${encodeURIComponent(id)}/profile`,{method:'POST',body:{name:pet.name,profile,published}});},
     agent:id=>call(`/v1/pets/${encodeURIComponent(id)}/agent`),
     updateAgent:(id,body)=>call(`/v1/pets/${encodeURIComponent(id)}/agent`,{method:'POST',body}),
     applications:()=>call('/v1/applications'),

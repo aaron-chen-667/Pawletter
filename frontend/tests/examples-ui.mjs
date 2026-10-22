@@ -10,7 +10,7 @@ await page.route('https://pawletter-api-446222711695.asia-east1.run.app/**',rout
 await page.addInitScript(()=>sessionStorage.setItem('pawletter.auth.v1','formal-session-sentinel'));
 const action=(name,value)=>page.locator(`[data-action="${name}"]${value?`[data-value="${value}"]`:''}`).first();
 async function scene(name){await action('example-scenes').click();await action('example-scene',name).click();}
-async function shot(name){await page.screenshot({path:fileURLToPath(new URL(name+'.png',directory)),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' overflow');assert.equal(await page.locator('img').evaluateAll(imgs=>imgs.filter(i=>i.loading!=='lazy').every(i=>i.complete&&i.naturalWidth>0)),true,name+' images');}
+async function shot(name){await page.waitForFunction(()=>Array.from(document.images).filter(i=>i.loading!=='lazy').every(i=>i.complete));await page.screenshot({path:fileURLToPath(new URL(name+'.png',directory)),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' overflow');assert.equal(await page.locator('img').evaluateAll(imgs=>imgs.filter(i=>i.loading!=='lazy').every(i=>i.complete&&i.naturalWidth>0)),true,name+' images');}
 try{
  await page.goto('http://localhost:4178/?examples=1');await page.locator('.example-toolbar').waitFor();
  for(const [name] of exampleScenes){await scene(name);await shot(name);}

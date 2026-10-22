@@ -79,3 +79,16 @@ CREATE TABLE IF NOT EXISTS pet_intakes (
  id text PRIMARY KEY,author_id text NOT NULL REFERENCES users(id),pet_id text UNIQUE NOT NULL REFERENCES pets(id),
  request_hash text NOT NULL,source_text text NOT NULL,ocr_text text NOT NULL,observation_id text REFERENCES observations(id),created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE media ADD COLUMN IF NOT EXISTS shared boolean NOT NULL DEFAULT true;
+ALTER TABLE media ADD COLUMN IF NOT EXISTS caption text NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS media_batches (
+ id text PRIMARY KEY,pet_id text NOT NULL REFERENCES pets(id),owner_id text NOT NULL REFERENCES users(id),request_hash text NOT NULL,created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS rescue_followups (
+ id text PRIMARY KEY,application_id text NOT NULL REFERENCES adoption_applications(id),due_at timestamptz NOT NULL,
+ status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','confirmation','attention','completed')),
+ version integer NOT NULL DEFAULT 1,history jsonb NOT NULL DEFAULT '[]',idempotency_key text UNIQUE NOT NULL,request_hash text NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS followup_active ON rescue_followups(application_id) WHERE status<>'completed';

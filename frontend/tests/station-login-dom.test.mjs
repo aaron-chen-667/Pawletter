@@ -9,7 +9,7 @@ test('station entry rejects adopter account and only opens workspace after stati
   if(url.endsWith('/login'))return Response.json({token:'test-token',user:{id:'u',role,stationId:role==='station'?'s':null}});
   if(url.endsWith('/logout')){loggedOut++;return Response.json({ok:true});}
   if(url.endsWith('/pets')){petReads++;return Response.json({pets:[]});}
-  if(url.endsWith('/applications'))return Response.json({applications:[]});throw Error('Unexpected endpoint');
+  if(url.endsWith('/applications'))return Response.json({applications:[]});if(url.endsWith('/followups'))return Response.json({followups:[]});throw Error('Unexpected endpoint');
  };
  const q=s=>document.querySelector(s);
  const login=()=>{q('[name=username]').value='test';q('[name=password]').value='test-password';q('#login-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));};

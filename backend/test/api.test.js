@@ -55,6 +55,14 @@ test('intake confirms one archive, isolates original OCR and private media, and 
  assert.doesNotMatch((await request(adopter,'GET',`/v1/pets/${id}`)).body,/材料原文/);
  await db.query('UPDATE pets SET published=false WHERE id=$1',[id]);
 });
+test('additional pet media stays private per item, is idempotent and rejects other stations',async()=>{
+ const photo='data:image/jpeg;base64,'+Buffer.concat([Buffer.from([255,216]),Buffer.alloc(24)]).toString('base64'),body={photos:[photo],caption:'今天的新观察',shared:false},key=randomUUID(),url=`/v1/pets/${pet}/visuals`;
+ assert.equal((await request(other,'POST',url,body,{'idempotency-key':key})).statusCode,403);
+ const result=await request(station,'POST',url,body,{'idempotency-key':key});assert.equal(result.statusCode,201,result.body);assert.equal((await request(station,'POST',url,body,{'idempotency-key':key})).statusCode,201);
+ assert.equal((await request(station,'POST',url,{...body,caption:'不同内容'},{'idempotency-key':key})).statusCode,409);
+ const media=(await request(station,'GET',`/v1/pets/${pet}/intake`)).json().visuals;assert.equal(media.length,1);assert.equal(media[0].caption,body.caption);
+ assert.equal((await app.inject(`/v1/pets/${pet}/visual/0`)).statusCode,401);assert.equal((await request(adopter,'GET',`/v1/pets/${pet}/visual/0`)).statusCode,403);assert.equal((await request(station,'GET',`/v1/pets/${pet}/visual/0`)).statusCode,200);
+});
 test('anonymous onboarding speech validates audio and origin, limits shared spend and never stores media',async()=>{
  const wav=Buffer.alloc(44);wav.write('RIFF');wav.write('WAVE',8);
  const options={method:'POST',url:'/v1/onboarding/transcribe',headers:{origin:'https://pawletter-adoption-h5.chenaaron668.chatgpt.site','content-type':'audio/wav'},payload:wav};

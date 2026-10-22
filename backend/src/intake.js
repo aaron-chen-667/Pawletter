@@ -44,12 +44,26 @@ export async function intakeRoutes(app,{db,ai,storage,origin}){
  app.get('/v1/pets/:id/intake',{preHandler:staff},async req=>{
   const p=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];assert(p&&p.station_id===req.user.station_id,403,'STATION_REQUIRED');
   const source=(await db.query('SELECT source_text,ocr_text FROM pet_intakes WHERE pet_id=$1',[p.id])).rows[0]||{};
-  const visuals=(await db.query('SELECT object_name,mime FROM media WHERE pet_id=$1 AND object_name LIKE $2 ORDER BY object_name',[p.id,`pets/${p.id}/visual/%`])).rows.map(m=>({url:`${origin}/v1/pets/${p.id}/visual/${m.object_name.split('/').pop()}`,mime:m.mime}));
+  const visuals=(await db.query('SELECT object_name,mime,caption,shared,created_at FROM media WHERE pet_id=$1 AND object_name LIKE $2 ORDER BY created_at DESC,object_name',[p.id,`pets/${p.id}/visual/%`])).rows.map(m=>({url:`${origin}/v1/pets/${p.id}/visual/${m.object_name.split('/').pop()}`,mime:m.mime,caption:m.caption,shared:m.shared,createdAt:m.created_at}));
   return {...source,visuals};
  });
+ app.post('/v1/pets/:id/visuals',{preHandler:staff,bodyLimit:20*1024*1024},async(req,reply)=>{
+  const body=z.object({photos:z.array(image).max(3),video:z.string().max(14500000).optional(),caption:z.string().trim().max(1000).default(''),shared:z.boolean().default(false)}).strict().parse(req.body),key=z.uuid().parse(req.headers['idempotency-key']),hash=digest(JSON.stringify(body));
+  const media=body.photos.map(v=>decode(v));if(body.video)media.push(decode(body.video,true));assert(media.length,400,'EMPTY_MEDIA');
+  await transaction(db,async c=>{
+   const p=(await c.query('SELECT * FROM pets WHERE id=$1 FOR UPDATE',[req.params.id])).rows[0];assert(p&&p.station_id===req.user.station_id,403,'STATION_REQUIRED');
+   const old=(await c.query('SELECT * FROM media_batches WHERE id=$1',[key])).rows[0];if(old){assert(old.pet_id===p.id&&old.owner_id===req.user.id&&old.request_hash===hash,409,'IDEMPOTENCY_CONFLICT');return;}
+   const existing=(await c.query('SELECT object_name FROM media WHERE pet_id=$1 AND object_name LIKE $2',[p.id,`pets/${p.id}/visual/%`])).rows;const start=existing.reduce((n,m)=>Math.max(n,Number(m.object_name.split('/').pop())+1),0);assert(start+media.length<=500,400,'MEDIA_LIMIT');const objects=[];
+   try{for(let i=0;i<media.length;i++){const m=media[i],object=`pets/${p.id}/visual/${start+i}`;await storage.put(object,m.bytes,m.mime);objects.push(object);await c.query('INSERT INTO media(id,pet_id,owner_id,object_name,mime,size,caption,shared) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[randomUUID(),p.id,req.user.id,object,m.mime,m.bytes.length,body.caption,body.shared]);}
+    await c.query('INSERT INTO media_batches(id,pet_id,owner_id,request_hash) VALUES($1,$2,$3,$4)',[key,p.id,req.user.id,hash]);
+    if(!p.profile.photoUrl&&body.photos.length&&body.shared)await c.query("UPDATE pets SET profile=jsonb_set(profile,'{photoUrl}',to_jsonb($1::text)) WHERE id=$2",[`${origin}/v1/pets/${p.id}/visual/${start}`,p.id]);
+   }catch(e){await Promise.allSettled(objects.map(o=>storage.remove(o)));throw e;}
+  });return reply.code(201).send({ok:true});
+ });
  app.get('/v1/pets/:id/visual/:slot',async(req,reply)=>{
-  assert(/^\d$/.test(req.params.slot),404,'MEDIA_NOT_FOUND');const p=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];assert(p,404,'PET_NOT_FOUND');
-  if(!p.published){const user=await authenticate(db,req);assert(user.station_id===p.station_id,403,'STATION_REQUIRED');}
-  const m=(await db.query('SELECT * FROM media WHERE pet_id=$1 AND object_name=$2',[p.id,`pets/${p.id}/visual/${req.params.slot}`])).rows[0];assert(m,404,'MEDIA_NOT_FOUND');return reply.header('Cache-Control','private, no-store').type(m.mime).send(await storage.read(m.object_name));
+  assert(/^\d{1,3}$/.test(req.params.slot),404,'MEDIA_NOT_FOUND');const p=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];assert(p,404,'PET_NOT_FOUND');
+  const m=(await db.query('SELECT * FROM media WHERE pet_id=$1 AND object_name=$2',[p.id,`pets/${p.id}/visual/${req.params.slot}`])).rows[0];assert(m,404,'MEDIA_NOT_FOUND');
+  if(!p.published||!m.shared){const user=await authenticate(db,req);assert(user.station_id===p.station_id,403,'STATION_REQUIRED');}
+  return reply.header('Cache-Control','private, no-store').type(m.mime).send(await storage.read(m.object_name));
  });
 }

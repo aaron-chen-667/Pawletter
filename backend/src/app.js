@@ -11,11 +11,12 @@ import { audioTypes, validAudio } from './storage.js';
 import {registerAdopter,adopterProfile,reserveBudget,answerOptions,answersSchema,lifestyleSchema,analysisSchema} from './onboarding.js';
 import {petProfileSchema,voiceSchema,defaultVoice,readAgent} from './pet-agent.js';
 import {applicationRoutes} from './applications.js';
+import {followupRoutes} from './followups.js';
 import {intakeRoutes} from './intake.js';
 
 const text = max => z.string().trim().min(1).max(max);
 const observationBody = z.object({text:z.string().trim().max(12000).default(''),mediaId:z.string().uuid().optional(),shareWithAgent:z.boolean().default(false),replacesId:z.string().uuid().optional()}).strict().refine(v=>!!v.text || !!v.mediaId,'Text or audio is required');
-const publicPet = row => ({id:row.id,name:row.name,stationId:row.station_id,profile:row.profile});
+const publicPet = row => ({id:row.id,name:row.name,stationId:row.station_id,published:row.published,profile:row.profile});
 const topicWords={health:'健康|肠胃|软便|呕吐|生病|疫苗|绝育|过敏|食欲',diet:'饮食|吃|喝|粮|喂|罐头',habits:'作息|习惯|睡|独处|厕所|猫砂|散步',likes:'喜欢|玩|抱|摸|怕|躲|亲近|互动'};
 export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin = 'https://pawletter-adoption-h5.chenaaron668.chatgpt.site', logger = false }) {
   const app = Fastify({logger,disableRequestLogging:true,bodyLimit:20*1024*1024,requestTimeout:180000,trustProxy:false});
@@ -35,6 +36,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   app.get('/health',async()=>({ok:true,service:'pawletter-api'}));
   app.get('/ready',async(req,reply)=>{try {await db.query('SELECT 1');return {ok:true};}catch{return reply.code(503).send({ok:false});}});
   const auth = async req => { req.user = await authenticate(db,req); };
+  await followupRoutes(app,{db});
   await intakeRoutes(app,{db,ai,storage,origin:process.env.WORKER_AUDIENCE||'https://pawletter-api-446222711695.asia-east1.run.app'});
   async function petFor(user,id,write=false) {
     const pet = (await db.query('SELECT * FROM pets WHERE id=$1',[id])).rows[0];
@@ -96,7 +98,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   app.post('/v1/auth/logout',{preHandler:auth},async req=>{await db.query('DELETE FROM sessions WHERE token_hash=$1',[digest(req.headers.authorization.slice(7))]);return {ok:true};});
   app.get('/v1/me',{preHandler:auth},async req=>({id:req.user.id,role:req.user.role,stationId:req.user.station_id}));
   app.get('/v1/catalog',async()=>({pets:(await db.query("SELECT p.*,s.name AS station_name FROM pets p JOIN stations s ON s.id=p.station_id WHERE p.published=true AND COALESCE((p.profile->>'internal')::boolean,false)=false AND p.name NOT LIKE '联调·%' ORDER BY p.created_at DESC LIMIT 100")).rows.map(row=>({...publicPet(row),stationName:row.station_name}))}));
-  app.get('/v1/pets',{preHandler:auth},async req=>({pets:(await db.query('SELECT * FROM pets WHERE published=true OR station_id=$1 ORDER BY created_at DESC LIMIT 100',[req.user.station_id])).rows.map(publicPet)}));
+  app.get('/v1/pets',{preHandler:auth},async req=>({pets:(await db.query(req.user.role==='station'?'SELECT * FROM pets WHERE station_id=$1 ORDER BY created_at DESC':'SELECT * FROM pets WHERE published=true OR station_id=$1 ORDER BY created_at DESC LIMIT 100',[req.user.station_id])).rows.map(publicPet)}));
   app.post('/v1/pets',{preHandler:auth},async(req,reply)=>{
     assert(req.user.role==='station',403,'STATION_REQUIRED');
     const body = z.object({name:text(80),profile:petProfileSchema,published:z.boolean().default(false)}).strict().parse(req.body);
@@ -153,7 +155,8 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   });
   app.get('/v1/pets/:id/observations',{preHandler:auth},async req=>{
     await petFor(req.user,req.params.id,true);
-    return {observations:(await db.query('SELECT id,original_text,transcript,media_id,share_with_agent,status,attempts,error_code,replaces_id,created_at,updated_at FROM observations WHERE pet_id=$1 ORDER BY created_at DESC LIMIT 100',[req.params.id])).rows};
+    const q=z.object({q:z.string().max(200).default(''),status:z.enum(['all','archived','processing','failed','withdrawn']).default('all'),from:z.union([z.iso.date(),z.literal('')]).default(''),to:z.union([z.iso.date(),z.literal('')]).default(''),order:z.enum(['asc','desc']).default('desc'),id:z.string().max(100).default('')}).parse(req.query);
+    return {observations:(await db.query(`SELECT id,original_text,transcript,media_id,share_with_agent,status,attempts,error_code,replaces_id,created_at,updated_at FROM observations WHERE pet_id=$1 AND ($2='' OR position(lower($2) in lower(original_text||' '||COALESCE(transcript,'')))>0) AND ($3='all' OR status=$3 OR ($3='processing' AND status='queued')) AND ($4::date IS NULL OR created_at>=($4::date::timestamp AT TIME ZONE 'Asia/Shanghai')) AND ($5::date IS NULL OR created_at<(($5::date+1)::timestamp AT TIME ZONE 'Asia/Shanghai')) AND ($6='' OR id=$6) ORDER BY created_at ${q.order==='asc'?'ASC':'DESC'},id LIMIT 100`,[req.params.id,q.q,q.status,q.from||null,q.to||null,q.id])).rows};
   });
   async function observationFor(req){const row=(await db.query('SELECT * FROM observations WHERE id=$1',[req.params.id])).rows[0];assert(row,404,'OBSERVATION_NOT_FOUND');await petFor(req.user,row.pet_id,true);return row;}
   app.post('/v1/observations/:id/process',{preHandler:auth,config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async req=>{await observationFor(req);return processOne(deps,req.params.id);});
@@ -167,7 +170,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     await transaction(db,async client=>{await client.query("UPDATE observations SET status='withdrawn',lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1",[req.params.id]);await audit(client,req.user,'observation.withdrawn',req.params.id);});
     return {ok:true};
   });
-  async function notesFor(petId,includePrivate=false,topics=null){return (await db.query(`SELECT k.id,k.quote,k.topic,k.certainty,o.created_at AS recorded_at,s.name AS station
+  async function notesFor(petId,includePrivate=false,topics=null){return (await db.query(`SELECT k.id,k.observation_id,k.quote,k.topic,k.certainty,o.created_at AS recorded_at,s.name AS station
     FROM knowledge k JOIN observations o ON o.id=k.observation_id JOIN pets p ON p.id=k.pet_id JOIN stations s ON s.id=p.station_id
     WHERE k.pet_id=$1 AND o.status='archived' AND (o.share_with_agent=true OR $2::boolean=true)
     ORDER BY CASE WHEN $3::text[] IS NULL THEN 0 WHEN k.topic=ANY($3::text[]) OR k.quote ~ $4::text THEN 0 ELSE 1 END,

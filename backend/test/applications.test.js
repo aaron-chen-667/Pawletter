@@ -19,5 +19,15 @@ test('applications snapshot shared profile, isolate station access, notify in pe
   const stage=(name,value)=>app.inject({method:'POST',url:'/v1/applications/'+application.id+'/stage',headers:headers(name),payload:{stage:value,version:application.version}});
   assert.equal((await stage('adopter-a',1)).statusCode,403);application=(await stage('station-a',1)).json();application=(await stage('station-a',2)).json();const blocked=await stage('station-a',3);assert.equal(blocked.statusCode,409,blocked.body);assert.equal(blocked.json().error,'IDENTITY_PENDING');
   await db.query("UPDATE adopter_profiles SET verification='verified' WHERE user_id=$1",[owner]);application=(await stage('station-a',3)).json();assert.equal(application.stage,3);assert.equal((await db.query('SELECT profile FROM pets WHERE id=$1',[pet.id])).rows[0].profile.adopted,true);
+  const followBody={applicationId:application.id,dueAt:'2026-11-01T02:00:00.000Z',note:'第七天到家回访'},followKey=randomUUID();
+  const schedule=name=>app.inject({method:'POST',url:'/v1/followups',headers:{...headers(name),'idempotency-key':followKey},payload:followBody});
+  assert.equal((await schedule('adopter-a')).statusCode,403);assert.equal((await schedule('station-b')).statusCode,403);
+  const scheduled=await schedule('station-a');assert.equal(scheduled.statusCode,201,scheduled.body);let follow=scheduled.json();assert.equal((await schedule('station-a')).json().id,follow.id);
+  assert.equal((await app.inject({url:'/v1/followups',headers:headers('station-b')})).json().followups.length,0);
+  const update={status:'attention',note:'进食变化，需要继续联系确认。',dueAt:followBody.dueAt,version:follow.version,requestId:randomUUID()};
+  const record=name=>app.inject({method:'POST',url:'/v1/followups/'+follow.id,headers:headers(name),payload:update});
+  assert.equal((await record('station-b')).statusCode,403);const updated=await record('station-a');assert.equal(updated.statusCode,200,updated.body);follow=updated.json();assert.equal(follow.history.length,2);assert.equal((await record('station-a')).json().version,follow.version);
+  const stale=await app.inject({method:'POST',url:'/v1/followups/'+follow.id,headers:headers('station-a'),payload:{...update,requestId:randomUUID()}});assert.equal(stale.statusCode,409);
+  const complete=await app.inject({method:'POST',url:'/v1/followups/'+follow.id,headers:headers('station-a'),payload:{...update,status:'completed',version:follow.version,requestId:randomUUID()}});assert.equal(complete.json().status,'completed');
  }finally{await app.close();await engine.close();}
 });

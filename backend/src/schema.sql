@@ -75,3 +75,7 @@ CREATE TABLE IF NOT EXISTS adoption_applications (
  UNIQUE(adopter_id,idempotency_key)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS adoption_active ON adoption_applications(pet_id,adopter_id) WHERE stage>=0;
+CREATE TABLE IF NOT EXISTS pet_intakes (
+ id text PRIMARY KEY,author_id text NOT NULL REFERENCES users(id),pet_id text UNIQUE NOT NULL REFERENCES pets(id),
+ request_hash text NOT NULL,source_text text NOT NULL,ocr_text text NOT NULL,observation_id text REFERENCES observations(id),created_at timestamptz NOT NULL DEFAULT now()
+);

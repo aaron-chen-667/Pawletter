@@ -32,6 +32,29 @@ before(async()=>{
  for(const published of [true,false]){const r=await request(station,'POST','/v1/pets',{name:'吐司',profile:{species:'cat'},published});assert.equal(r.statusCode,201,r.body);if(published)pet=r.json().id;else privatePet=r.json().id;}
 });
 after(async()=>{await app?.close();await engine?.close();});
+test('intake confirms one archive, isolates original OCR and private media, and rejects conflicting retries',async()=>{
+ const photo='data:image/jpeg;base64,'+Buffer.concat([Buffer.from([255,216]),Buffer.alloc(24)]).toString('base64');
+ const draft={name:'小满',species:'cat',description:'估计一岁，尚未核实。',character:'',age:'估计一岁',sex:'unknown',ocrText:'材料原文 3.2 kg',nextQuestion:'最近的健康情况怎么样？',uncertainties:['年龄待确认']};
+ ai.draftIntake=async body=>{assert.equal(body.images[0].kind,'document');return draft;};
+ const input={text:'估计一岁，尚未核实。',images:[{kind:'document',dataUrl:photo}]};
+ assert.equal((await request(adopter,'POST','/v1/intake/analyze',input)).statusCode,403);
+ const analyzed=await request(station,'POST','/v1/intake/analyze',input);assert.equal(analyzed.statusCode,200,analyzed.body);assert.equal(analyzed.json().nextQuestion,draft.nextQuestion);
+ const body={name:draft.name,profile:{species:'cat',description:draft.description,age:draft.age},published:false,text:input.text,ocrText:draft.ocrText,photos:[photo]},key=randomUUID();
+ const first=await request(station,'POST','/v1/intake/commit',body,{'idempotency-key':key});assert.equal(first.statusCode,201,first.body);const id=first.json().id;
+ const second=await request(station,'POST','/v1/intake/commit',body,{'idempotency-key':key});assert.equal(second.json().id,id);
+ assert.equal((await request(station,'POST','/v1/intake/commit',{...body,name:'另一个名字'},{'idempotency-key':key})).statusCode,409);
+ assert.equal((await request(other,'GET',`/v1/pets/${id}/intake`)).statusCode,403);
+ assert.equal((await request(station,'GET',`/v1/pets/${id}/intake`)).json().ocr_text,draft.ocrText);
+ assert.equal((await app.inject(`/v1/pets/${id}/visual/0`)).statusCode,401);
+ assert.equal((await request(other,'GET',`/v1/pets/${id}/visual/0`)).statusCode,403);
+ assert.equal((await request(station,'GET',`/v1/pets/${id}/visual/0`)).statusCode,200);
+ assert.equal((await db.query('SELECT * FROM observations WHERE pet_id=$1',[id])).rows.length,1);
+ assert.equal((await db.query('SELECT * FROM pet_agents WHERE pet_id=$1',[id])).rows.length,1);
+ await db.query('UPDATE pets SET published=true WHERE id=$1',[id]);
+ assert.equal((await app.inject(`/v1/pets/${id}/visual/0`)).statusCode,200);
+ assert.doesNotMatch((await request(adopter,'GET',`/v1/pets/${id}`)).body,/材料原文/);
+ await db.query('UPDATE pets SET published=false WHERE id=$1',[id]);
+});
 test('anonymous onboarding speech validates audio and origin, limits shared spend and never stores media',async()=>{
  const wav=Buffer.alloc(44);wav.write('RIFF');wav.write('WAVE',8);
  const options={method:'POST',url:'/v1/onboarding/transcribe',headers:{origin:'https://pawletter-adoption-h5.chenaaron668.chatgpt.site','content-type':'audio/wav'},payload:wav};

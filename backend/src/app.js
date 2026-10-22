@@ -11,6 +11,7 @@ import { audioTypes, validAudio } from './storage.js';
 import {registerAdopter,adopterProfile,reserveBudget,answerOptions,answersSchema,lifestyleSchema,analysisSchema} from './onboarding.js';
 import {petProfileSchema,voiceSchema,defaultVoice,readAgent} from './pet-agent.js';
 import {applicationRoutes} from './applications.js';
+import {intakeRoutes} from './intake.js';
 
 const text = max => z.string().trim().min(1).max(max);
 const observationBody = z.object({text:z.string().trim().max(12000).default(''),mediaId:z.string().uuid().optional(),shareWithAgent:z.boolean().default(false),replacesId:z.string().uuid().optional()}).strict().refine(v=>!!v.text || !!v.mediaId,'Text or audio is required');
@@ -19,6 +20,7 @@ const topicWords={health:'健康|肠胃|软便|呕吐|生病|疫苗|绝育|过�
 export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin = 'https://pawletter-adoption-h5.chenaaron668.chatgpt.site', logger = false }) {
   const app = Fastify({logger,disableRequestLogging:true,bodyLimit:20*1024*1024,requestTimeout:180000,trustProxy:false});
   const deps = {db,ai,storage};
+  // The public asset URL is server-owned, never accepted from an intake client.
   await app.register(cors,{origin,methods:['GET','POST','DELETE','OPTIONS'],allowedHeaders:['Content-Type','Authorization','Idempotency-Key'],credentials:false});
   await app.register(rateLimit,{max:60,timeWindow:'1 minute'});
   app.addContentTypeParser(audioTypes,{parseAs:'buffer'},(req,body,done)=>done(null,body));
@@ -33,6 +35,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   app.get('/health',async()=>({ok:true,service:'pawletter-api'}));
   app.get('/ready',async(req,reply)=>{try {await db.query('SELECT 1');return {ok:true};}catch{return reply.code(503).send({ok:false});}});
   const auth = async req => { req.user = await authenticate(db,req); };
+  await intakeRoutes(app,{db,ai,storage,origin:process.env.WORKER_AUDIENCE||'https://pawletter-api-446222711695.asia-east1.run.app'});
   async function petFor(user,id,write=false) {
     const pet = (await db.query('SELECT * FROM pets WHERE id=$1',[id])).rows[0];
     assert(pet,404,'PET_NOT_FOUND');

@@ -1,6 +1,7 @@
 // Browser integration module. No secrets and no automatic upload of local demo state.
 export function createPawletterClient(baseUrl, fetcher=fetch) {
-  const base=baseUrl.replace(/\/$/,'');let token=null;
+  const base=baseUrl.replace(/\/$/,'');let token=null;const mediaCache=new Map();
+  async function visual(url){if(!url?.startsWith(base+'/v1/pets/'))return url;if(mediaCache.has(url))return mediaCache.get(url);const r=await fetcher(url,{headers:token?{Authorization:`Bearer ${token}`}:{}});if(!r.ok)return '';const value=URL.createObjectURL(await r.blob());mediaCache.set(url,value);return value;}
   async function call(path,{method='GET',body,headers={},signal}={}) {
     const binary=typeof Blob!=='undefined'&&body instanceof Blob;
     const response=await fetcher(`${base}${path}`,{method,signal:signal||AbortSignal.timeout(190000),credentials:'omit',headers:{...(token?{Authorization:`Bearer ${token}`} : {}),...(body!==undefined&&!binary?{'Content-Type':'application/json'}:{}),...headers},...(body===undefined?{}:{body:binary?body:JSON.stringify(body)})});
@@ -9,9 +10,12 @@ export function createPawletterClient(baseUrl, fetcher=fetch) {
   }
   return {
     async login(username,password){const result=await call('/v1/auth/login',{method:'POST',body:{username,password}});token=result.token;return {user:result.user,expiresAt:result.expiresAt};},
-    async logout(){try{await call('/v1/auth/logout',{method:'POST'});}finally{token=null;}},
+    async logout(){try{await call('/v1/auth/logout',{method:'POST'});}finally{token=null;for(const url of mediaCache.values())URL.revokeObjectURL(url);mediaCache.clear();}},
     me:()=>call('/v1/me'),
-    pets:()=>call('/v1/pets'),
+    async pets(){const data=await call('/v1/pets');await Promise.all(data.pets.map(async p=>{if(p.profile?.photoUrl)p.profile.photoUrl=await visual(p.profile.photoUrl);}));return data;},
+    draftIntake:body=>call('/v1/intake/analyze',{method:'POST',body}),
+    commitIntake:(body,key)=>call('/v1/intake/commit',{method:'POST',body,headers:{'Idempotency-Key':key}}),
+    async intake(id){const data=await call(`/v1/pets/${encodeURIComponent(id)}/intake`);await Promise.all((data.visuals||[]).map(async v=>v.url=await visual(v.url)));return data;},
     createPet:body=>call('/v1/pets',{method:'POST',body}),
     updatePet:(id,body)=>call(`/v1/pets/${encodeURIComponent(id)}/profile`,{method:'POST',body}),
     agent:id=>call(`/v1/pets/${encodeURIComponent(id)}/agent`),

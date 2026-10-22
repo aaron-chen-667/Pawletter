@@ -13,12 +13,14 @@ export function validAudio(buffer, mime) {
 export function createStorage(env = process.env) {
   if (!env.GCS_BUCKET) throw new Error('GCS_BUCKET is required');
   const bucket = new Storage({projectId:env.GCP_PROJECT}).bucket(env.GCS_BUCKET);
+  const archiveBucket=env.ARCHIVE_GCS_BUCKET?new Storage({projectId:env.GCP_PROJECT}).bucket(env.ARCHIVE_GCS_BUCKET):bucket;
+  const target=name=>name.includes('/visual/')?archiveBucket:bucket;
   return {
-    async put(name,buffer,mime) { await bucket.file(name).save(buffer,{resumable:false,preconditionOpts:{ifGenerationMatch:0},metadata:{contentType:mime,cacheControl:'private, no-store'}}); },
+    async put(name,buffer,mime) { await target(name).file(name).save(buffer,{resumable:false,preconditionOpts:{ifGenerationMatch:0},metadata:{contentType:mime,cacheControl:'private, no-store'}}); },
     async read(name) {
-      try { const [bytes] = await bucket.file(name).download(); return bytes; }
+      try { const [bytes] = await target(name).file(name).download(); return bytes; }
       catch(e) { if (Number(e.code)===404) throw new ApiError(410,'MEDIA_EXPIRED'); throw new ApiError(503,'MEDIA_UNAVAILABLE'); }
     },
-    async remove(name) { await bucket.file(name).delete({ignoreNotFound:true}); }
+    async remove(name) { await target(name).file(name).delete({ignoreNotFound:true}); }
   };
 }

@@ -19,10 +19,15 @@ const observationBody = z.object({text:z.string().trim().max(12000).default(''),
 const publicPet = row => ({id:row.id,name:row.name,stationId:row.station_id,published:row.published,profile:row.profile});
 const topicWords={health:'健康|肠胃|软便|呕吐|生病|疫苗|绝育|过敏|食欲',diet:'饮食|吃|喝|粮|喂|罐头',habits:'作息|习惯|睡|独处|厕所|猫砂|散步',likes:'喜欢|玩|抱|摸|怕|躲|亲近|互动'};
 export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin = 'https://pawletter-adoption-h5.chenaaron668.chatgpt.site', logger = false }) {
+  const allowedOrigins=[...new Set(origin.split(',').map(value=>{
+    const url=new URL(value.trim());
+    if(!['https:','http:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('INVALID_FRONTEND_ORIGIN');
+    return url.origin;
+  }))];
   const app = Fastify({logger,disableRequestLogging:true,bodyLimit:20*1024*1024,requestTimeout:180000,trustProxy:false});
   const deps = {db,ai,storage};
   // The public asset URL is server-owned, never accepted from an intake client.
-  await app.register(cors,{origin,methods:['GET','POST','DELETE','OPTIONS'],allowedHeaders:['Content-Type','Authorization','Idempotency-Key'],credentials:false});
+  await app.register(cors,{origin:allowedOrigins,methods:['GET','POST','DELETE','OPTIONS'],allowedHeaders:['Content-Type','Authorization','Idempotency-Key'],credentials:false});
   await app.register(rateLimit,{max:60,timeWindow:'1 minute'});
   app.addContentTypeParser(audioTypes,{parseAs:'buffer'},(req,body,done)=>done(null,body));
   app.setErrorHandler((err,request,reply)=>{
@@ -48,7 +53,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   const audit = (client,user,action,id) => client.query('INSERT INTO audit_events(id,actor_id,action,target_id) VALUES($1,$2,$3,$4)',[randomUUID(),user.id,action,id]);
   app.post('/v1/onboarding/transcribe',{bodyLimit:6*1024*1024,config:{rateLimit:{max:8,timeWindow:'1 minute'}}},async(req,reply)=>{
     // Origin is a browser boundary, not authentication. Shared quotas bound anonymous spend.
-    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    assert(allowedOrigins.includes(req.headers.origin),403,'ORIGIN_REQUIRED');
     const mime=req.headers['content-type']?.split(';')[0];
     assert(validAudio(req.body,mime),400,'INVALID_AUDIO_FILE');
     await transaction(db,async client=>{

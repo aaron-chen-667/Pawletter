@@ -12,13 +12,15 @@ export function stationFixture(){
 export function createStationExamples(storage=globalThis.sessionStorage){
  let state=stationFixture();try{const old=JSON.parse(storage?.getItem(STATION_EXAMPLES_KEY));if(old?.version===2)state=old;}catch{}
  const copy=v=>structuredClone(v),save=()=>{try{storage?.setItem(STATION_EXAMPLES_KEY,JSON.stringify(state));}catch{}},row=id=>{const r=state.records.find(r=>r.id===id);if(!r)throw Error('OBSERVATION_NOT_ACTIVE');return r;};
- const note=r=>({id:r.id,observation_id:r.id,topic:r.topic||(/吃|粮|便|食欲/.test(r.original_text)?'health':'likes'),certainty:r.certainty||'observation',quote:r.original_text,station:'暖爪救助站 · 示例',recorded_at:r.created_at});
+ const note=(r,quote=r.original_text,i=0)=>({id:i?`${r.id}:${i}`:r.id,observation_id:r.id,topic:r.topic||(/吃|粮|罐头|喝水|食欲/.test(quote)?'diet':/便|伤|病|药|体重|疫苗|驱虫|绝育|检查/.test(quote)?'health':/喜欢|玩/.test(quote)?'likes':/躲|靠近|睡|作息|散步|蹭/.test(quote)?'habits':'other'),certainty:r.certainty||(/可能|不确定|待确认|不清楚/.test(quote)?'pending':/平时|一直|每天|通常|习惯/.test(quote)?'ongoing':'observation'),quote,station:'暖爪救助站 · 示例',recorded_at:r.created_at});
+ // Like the real worker, a new record is split into sentences so each one carries its own topic.
+ const notes=r=>r.topic?[note(r)]:r.original_text.split(/(?<=[。！？；\n])/).map(t=>t.trim()).filter(Boolean).map((quote,i)=>note(r,quote,i));
  const api={
   user:()=>copy(state.user),reset(empty=false){state=stationFixture();if(empty){state.pets=[];state.records=[];state.applications=[];state.followups=[];}save();},
   login:async()=>({user:copy(state.user)}),logout:async()=>{},me:async()=>copy(state.user),pets:async()=>({pets:copy(state.pets)}),applications:async()=>({applications:copy(state.applications)}),
   applicationStage:async(id,stage,version)=>{const a=state.applications.find(a=>a.id===id);if(!a||a.version!==version)throw Error('INVALID_INPUT');if(stage===3&&a.snapshot.verification!=='verified')throw Error('INVALID_INPUT');Object.assign(a,{stage,version:version+1});save();return copy(a);},
   setVisibility:async(id,published)=>{const p=state.pets.find(p=>p.id===id);if(!p||p.stationId!==state.user.stationId)throw Error('STATION_REQUIRED');p.published=published;save();return {ok:true};},
-  knowledge:async id=>({notes:state.records.filter(r=>r.pet_id===id&&r.status==='archived'&&r.share_with_agent).map(note)}),
+  knowledge:async id=>({notes:state.records.filter(r=>r.pet_id===id&&r.status==='archived'&&r.share_with_agent).flatMap(notes)}),
   observations:async(id,f={})=>({observations:copy(state.records.filter(r=>r.pet_id===id&&(!f.id||r.id===f.id)&&(!f.q||(r.original_text+' '+r.transcript).includes(f.q))&&(!f.status||f.status==='all'||(f.status==='processing'?['queued','processing'].includes(r.status):r.status===f.status))&&(!f.from||r.created_at>=new Date(f.from+'T00:00:00+08:00').toISOString())&&(!f.to||r.created_at<new Date(Date.parse(f.to+'T00:00:00+08:00')+86400000).toISOString())).sort((a,b)=>(f.order==='asc'?1:-1)*a.created_at.localeCompare(b.created_at)))}),
   followups:async()=>({followups:copy(state.followups)}),
   createFollowup:async(body,key)=>{const old=state.followups.find(f=>f.key===key);if(old)return copy(old);const a=state.applications.find(a=>a.id===body.applicationId);if(!a||a.stage!==3)throw Error('INVALID_INPUT');const f={id:crypto.randomUUID(),key,...body,name:a.name,petId:a.petId,adopterId:a.adopterId,status:'pending',version:1,updatedAt:stamp(),history:[{at:stamp(),status:'pending',text:body.note}]};state.followups.push(f);save();return copy(f);},
@@ -34,7 +36,15 @@ export function createStationExamples(storage=globalThis.sessionStorage){
    const lines=body.text.split('\n').map(t=>t.replace(/^救助者口述：/,''));
    const text=lines.join('；'),ageMatch=text.match(/(?:大概|约|估计)([一二三四五六七八九十两0-9]+)岁/),skipped=text.includes('不清楚');
    const estimated=/送来的人估计|送来人估计/.test(text),nameMatch=[...text.matchAll(/(?:它叫|名字是|名字：)([^，。；\s]{1,12})/g)].at(-1);
-   return {name:nameMatch?.[1]||'',species:/猫/.test(text)?'cat':/狗/.test(text)?'dog':'unknown',description:lines.filter(t=>!t.startsWith('更正档案：')&&!t.startsWith('这项不清楚')).join('\n').slice(0,4000),character:'',age:ageMatch?`约${ageMatch[1]}岁${estimated?'（送来人估计）':skipped?'（依据待确认）':'（估计）'}`:'',sex:'unknown',nextQuestion:skipped?'':ageMatch&&!estimated?'约一岁是估计的，还是有检查记录？':!text?'你目前了解它哪些情况？':'',ocrText:'',uncertainties:ageMatch&&!estimated?['年龄依据待确认']:[]};
+   // Mirror the real organiser: name and age move to fields, single-moment behaviour is labelled as such.
+   const clauses=lines.filter(t=>!t.startsWith('更正档案：')&&!t.startsWith('这项不清楚')).join('。').split(/[，。；\n]+/).map(t=>t.trim()).filter(t=>t&&!/名字|它叫|岁|估计的/.test(t));
+   const arrival=clauses.filter(t=>/接回|捡到|救助/.test(t)),moments=clauses.filter(t=>!arrival.includes(t));
+   const description=[arrival.join('，'),...moments.map(t=>/今天|刚|这次/.test(t)?`${t}（本次观察）`:t)].filter(Boolean).map(t=>t+'。').join('');
+   const declined=body.declined||[],said={species:/猫|狗/,age:/岁|个月/,sex:/公|母|弟弟|妹妹/,health:/伤|病|疫苗|驱虫|绝育|体检|健康/,character:/平时|性格|黏人|亲人|胆小|活泼|安静/,likes:/喜欢|爱玩|逗猫|摸/,habits:/猫砂|厕所|睡|作息|散步/,diet:/粮|罐头|喝水|饮食/};
+   const coverage=Object.fromEntries(Object.entries(said).map(([key,pattern])=>[key,declined.includes(key)?'unknown':pattern.test(text)?'covered':'missing']));
+   const questions={species:'它是猫还是狗？',age:'它大概几岁？是估计的还是查过？',sex:'它是公的还是母的？',health:'它身体怎么样？有没有受伤，打过疫苗、驱虫或绝育吗？',character:'它平时是什么性格？亲人还是怕生？',likes:'它喜欢吃什么、玩什么？被摸的时候什么反应？',habits:'它的生活习惯怎么样？会用猫砂吗，作息规律吗？',diet:'它平时吃什么？食量和喝水正常吗？'};
+   const ambiguity=ageMatch&&!estimated&&!skipped?'约一岁是估计的，还是有检查记录？':'',nextDimension=ambiguity?'':Object.keys(said).find(key=>coverage[key]==='missing')||'';
+   return {name:nameMatch?.[1]||'',species:/猫/.test(text)?'cat':/狗/.test(text)?'dog':'unknown',description:description.slice(0,4000),character:/平时[^，。；]*/.exec(text)?.[0]||'',coverage,nextDimension,age:ageMatch?`约${ageMatch[1]}岁${estimated?'（送来人估计）':skipped?'（依据待确认）':'（估计）'}`:'',sex:/公/.test(text)?'male':/母/.test(text)?'female':'unknown',nextQuestion:ambiguity||questions[nextDimension]||'',ocrText:'',uncertainties:ageMatch&&!estimated?['年龄依据待确认']:[]};
   },
   commitIntake:async(body,key)=>{
    const prior=state.pets.find(p=>p.key===key);if(prior)return {id:prior.id};

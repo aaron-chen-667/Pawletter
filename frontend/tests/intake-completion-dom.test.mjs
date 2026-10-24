@@ -61,10 +61,12 @@ test('intake completion blocks logout until its delayed list response opens the 
  await login('a');click('[data-live=new]');await until(()=>q('#intake-answer'));
  set('#intake-answer','本站新接收的一只动物，左耳有缺口。');
  assert.equal(calls.filter(c=>c.path==='/v1/intake/analyze').length,0);
+ submit('#intake-confirm');await until(()=>q('.intake-review')&&!q('#intake-confirm button').disabled);
+ assert.equal(calls.filter(c=>c.path==='/v1/intake/commit').length,0,'The first confirmation only organises the record');
  submit('#intake-confirm');await until(()=>resolveList);
  const saved=calls.find(c=>c.path==='/v1/intake/commit');
  assert.deepEqual(saved.body.photos,[]);assert.equal(saved.body.profile.species,'unknown');assert.equal(saved.body.published,false);
- assert.equal(saved.body.text,'本站新接收的一只动物，左耳有缺口。');assert.equal(saved.body.profile.description,saved.body.text);
+ assert.equal(saved.body.text,'本站新接收的一只动物，左耳有缺口。');assert.equal(saved.body.profile.description,petA.profile.description);
  click('[data-live=logout]');click('[data-live=home]');await new Promise(resolve=>setTimeout(resolve,20));
  assert.equal(calls.filter(c=>c.path==='/v1/auth/logout').length,0,'Logout must wait for completion navigation');
  assert.equal(q('#login-form'),null);assert.ok(q('#intake-confirm'));assert.equal(q('#intake-confirm button').disabled,true);

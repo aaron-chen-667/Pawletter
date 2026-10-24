@@ -17,7 +17,8 @@ try{
  await page.locator('#intake-record').click();assert.match(await page.locator('#intake-answer').inputValue(),/今天刚接回一只橘猫/);assert.equal(await page.locator('#intake-confirm').count(),1);
  const finalText='这只橘猫今天刚送来，还没起名字，大概一岁。人靠近会躲，刚吃了点罐头。';await page.locator('#intake-answer').fill(finalText);
  await page.screenshot({path:'.preview/v12/intake-review.png',fullPage:true});
- await page.locator('#intake-confirm button.primary').click();await page.locator('.station-pet-cover').waitFor();assert.match(await page.locator('.topbar-title').textContent(),/待命名/);assert.ok((await page.locator('.main').textContent()).includes(finalText));assert.equal(await page.locator('[aria-label="向领养者公开"]').getAttribute('aria-checked'),'false');
+ await page.locator('#intake-confirm button.primary').click();await page.locator('.intake-guide').waitFor();await page.screenshot({path:'.preview/v12/intake-guide.png',fullPage:true});
+ await page.locator('#intake-confirm button.primary').click();await page.locator('.station-pet-cover').waitFor();assert.match(await page.locator('.topbar-title').textContent(),/待命名小猫/);assert.ok((await page.locator('.main').textContent()).includes('人靠近会躲'));assert.equal(await page.locator('[aria-label="向领养者公开"]').getAttribute('aria-checked'),'false');
  await scene('voice');await click('sample-observation');assert.match(await page.locator('#observation-text').inputValue(),/今天换粮后有点软便/);assert.match(await page.locator('.topbar-title').textContent(),/给宠物补充/);await click('submit-text');await page.getByText('今天换粮后有点软便',{exact:false}).first().waitFor();
  assert.deepEqual(errors,[]);assert.deepEqual(apiCalls,[]);
  console.log(JSON.stringify({scenes:stationScenes.length,photoVoiceConfirm:true,privateDefault:true,exampleApiCalls:0,errors}));

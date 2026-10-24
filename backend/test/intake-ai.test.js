@@ -37,3 +37,16 @@ test('legacy model replies default to no corrections and preserve manual values 
  const legacy=await mock.ai.draftIntake({text:'橘色短毛猫。',images:[]});assert.equal(legacy.age,'五岁');assert.deepEqual(legacy.corrections,[]);
  const confirmed=await mock.ai.draftIntake({text:'橘色短毛猫。',images:[],confirmedFields:{age:'年龄不清楚'},latestText:'橘色短毛猫。'});assert.equal(confirmed.age,'年龄不清楚');assert.deepEqual(confirmed.corrections,[]);
 });
+test('guided coverage marks every dimension and never asks a dimension the rescuer declined',async()=>{
+ const mock=provider(draft({coverage:{age:'covered',health:'missing',character:'covered'},nextDimension:'health',nextQuestion:'它身体怎么样？打过疫苗吗？'}));
+ const asked=await mock.ai.draftIntake({text:'橘色短毛猫，送来的人说五岁，平时很亲人。',images:[]});
+ assert.equal(asked.nextDimension,'health');assert.equal(asked.nextQuestion,'它身体怎么样？打过疫苗吗？');
+ assert.deepEqual(asked.coverage,{species:'covered',age:'covered',sex:'missing',health:'missing',character:'covered',likes:'missing',habits:'missing',diet:'missing'});
+ const declined=await mock.ai.draftIntake({text:'橘色短毛猫。健康情况不清楚。',images:[],declined:['health']});
+ assert.equal(declined.coverage.health,'unknown');assert.equal(declined.nextDimension,'');assert.equal(declined.nextQuestion,'');
+ assert.deepEqual(JSON.parse(mock.request.messages[1].content[0].text).declined,['health']);
+});
+test('legacy model replies without coverage still list every dimension as missing except a known species',async()=>{
+ const legacy=await provider(draft()).ai.draftIntake({text:'橘色短毛猫。',images:[]});
+ assert.equal(legacy.nextDimension,'');assert.equal(legacy.coverage.species,'covered');assert.equal(legacy.coverage.health,'missing');assert.equal(Object.keys(legacy.coverage).length,8);
+});

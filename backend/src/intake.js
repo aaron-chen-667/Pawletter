@@ -8,9 +8,15 @@ import {reserveBudget} from './onboarding.js';
 const intakeProfileFields={name:z.string().max(80),species:z.enum(['cat','dog','unknown']),description:z.string().max(4000),character:z.string().max(500),age:z.string().max(80),sex:z.enum(['male','female','unknown'])};
 const correctionSchema=z.object({field:z.enum(Object.keys(intakeProfileFields)),quote:z.string().max(4000)}).strict();
 const confirmedFieldsSchema=z.object(intakeProfileFields).partial().strict();
-export const intakeDraftSchema=z.object({...intakeProfileFields,ocrText:z.string().max(6000),nextQuestion:z.string().max(200).default(''),uncertainties:z.array(z.string().max(160)).max(10),corrections:z.array(correctionSchema).max(6).default([])}).strict();
-export function validateIntakeDraft(value,{confirmedFields={},latestText=''}={}){
+// Guided intake dimensions: the profile fields the agent speaks from, then the knowledge topics it cites, in asking order.
+export const intakeDimensions=['species','age','sex','health','character','likes','habits','diet'];
+const dimension=z.enum(intakeDimensions),coverageSchema=z.object(Object.fromEntries(intakeDimensions.map(d=>[d,z.enum(['covered','unknown','missing'])]))).partial().strict();
+export const intakeDraftSchema=z.object({...intakeProfileFields,ocrText:z.string().max(6000),nextQuestion:z.string().max(200).default(''),nextDimension:z.union([dimension,z.literal('')]).default(''),coverage:coverageSchema.default({}),uncertainties:z.array(z.string().max(160)).max(10),corrections:z.array(correctionSchema).max(6).default([])}).strict();
+export function validateIntakeDraft(value,{confirmedFields={},latestText='',declined=[]}={}){
  const confirmed=confirmedFieldsSchema.parse(confirmedFields),draft=intakeDraftSchema.parse({...value,corrections:[]}),corrected=new Set();
+ // Every dimension gets a status; a skipped one is never asked again.
+ draft.coverage=Object.fromEntries(intakeDimensions.map(d=>[d,declined.includes(d)?'unknown':d==='species'&&draft.species!=='unknown'?'covered':draft.coverage[d]||'missing']));
+ if(draft.nextDimension&&draft.coverage[draft.nextDimension]!=='missing'){draft.nextDimension='';draft.nextQuestion='';}
  for(const item of Array.isArray(value?.corrections)?value.corrections:[]){
   const parsed=correctionSchema.safeParse(item);if(!parsed.success)continue;
   const {field,quote}=parsed.data;
@@ -36,7 +42,7 @@ function decode(value,video=false){
 export async function intakeRoutes(app,{db,ai,storage,origin}){
  const staff=async req=>{req.user=await authenticate(db,req);assert(req.user.role==='station',403,'STATION_REQUIRED');};
  app.post('/v1/intake/analyze',{preHandler:staff,bodyLimit:8*1024*1024,config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async req=>{
-  const body=z.object({text:z.string().trim().max(12000),images:z.array(z.object({kind:z.enum(['photo','video','document']),dataUrl:image}).strict()).max(5),confirmedFields:confirmedFieldsSchema.optional(),latestText:z.string().max(4000).optional()}).strict().parse(req.body);
+  const body=z.object({text:z.string().trim().max(12000),images:z.array(z.object({kind:z.enum(['photo','video','document']),dataUrl:image}).strict()).max(5),confirmedFields:confirmedFieldsSchema.optional(),latestText:z.string().max(4000).optional(),declined:z.array(dimension).max(intakeDimensions.length).optional()}).strict().parse(req.body);
   assert(body.text.length+(body.latestText?.length||0)+Object.values(body.confirmedFields||{}).reduce((length,value)=>length+value.length,0)<=20000,400,'INVALID_INPUT');
   assert(body.text||body.images.length,400,'EMPTY_INTAKE');body.images.forEach(i=>decode(i.dataUrl));await reserveBudget(db,'intake',10,200);
   return validateIntakeDraft(await ai.draftIntake(body),body);

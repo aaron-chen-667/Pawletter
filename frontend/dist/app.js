@@ -1,3 +1,4 @@
+import {escapeDisplay as esc} from './display-text.js';
 import { knowledgeTopics, observationEntries, confirmObservation, saveUnprocessedObservation, knowledgeReply } from './pet-knowledge.js';
 import { STORAGE_KEY, freshState, activePet, recommendations, extractMemory, mergeMemory, addMessage, greet, replyFor, reviewConversation, advanceApplication, summarizeFeedback, stages } from './domain.js';
 import { createCaptureController } from './capture.js';
@@ -24,7 +25,7 @@ let lifestyleStep=0,lifestyleText='',lifestyleValue='unknown',lifestyleReview=fa
 const lifestyleOwner=()=>state.account||state.registrationDraft;
 const accountApi=exampleMode?createExampleAccount(()=>state):createAdopterAccount();
 let authRestoring=accountApi.hasSession(),authBusy=false,registrationCredentials=null,registrationKey=null,pendingAction=null;
-let interviewEpoch=0,interviewReply='',interviewAnalysis=null,applicationNote='';
+let interviewEpoch=0,interviewTurns=[],interviewAnalysis=null,applicationNote='';
 let applicationReview=false,applicationKey=null,applicationBusy=false,applicationError='';
 let catalogRows=[],catalogBusy=true,catalogError='',chatBusy=false,chatError='',chatEpoch=0;
 let initialPetId=new URL(location.href).searchParams.get('pet');
@@ -142,7 +143,6 @@ const icons = {
   stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',
 };
 function icon(name,cls='') { return `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="${name==='paw'?'currentColor':'none'}" stroke="${name==='paw'?'none':'currentColor'}" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.paw}</svg>`; }
-function esc(value='') { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function photo(p,cls='',extra='') { return `<img class="${cls}" src="${esc(p.image||'./assets/paw.svg')}" alt="${esc(p.name)}的照片" ${extra} />`; }
 function button(label,action,cls='button',value='',extra='') { return `<button class="${cls}" data-action="${action}" ${value?`data-value="${esc(value)}"`:''} ${extra}>${label}</button>`; }
 function save() {
@@ -374,12 +374,12 @@ const voiceChat=createPressToTalk({capture,onChange:updateVoiceUI,onSend:async(u
 function resetLifestyleSpeech(){lifestyleSpeech.cancel();lifestyleSpeechBusy=false;lifestyleSpeechError='';}
 function loadLifestyleStep(index){
  if(!Number.isInteger(index)||index<0||index>=4)return;
- resetLifestyleSpeech();voiceChat.cancel();interviewEpoch++;capture.reset();lifestyleStep=index;lifestyleReview=false;lifestyleViewing=false;interviewAnalysis=null;interviewReply='';lifestyleText='';render();
+ resetLifestyleSpeech();voiceChat.cancel();interviewEpoch++;capture.reset();lifestyleStep=index;lifestyleReview=false;lifestyleViewing=false;interviewAnalysis=null;interviewTurns=interviewTurns.filter(turn=>turn.step<index);lifestyleText='';render();
 }
 function startLifestyle(){
  resetLifestyleSpeech();const owner=lifestyleOwner();if(!owner){registrationGate('lifestyle');return;}
  owner.lifestyleDraft??=structuredClone(owner.lifestyle?.answers||{});lifestyleViewing=!!owner.lifestyle;lifestyleReview=lifestyleViewing;
- interviewAnalysis=owner.lifestyle?.analysis||null;lifestyleStep=0;lifestyleText='';interviewReply='';capture.reset();navigate('lifestyle');
+ interviewAnalysis=owner.lifestyle?.analysis||null;lifestyleStep=0;lifestyleText='';interviewTurns=[];capture.reset();navigate('lifestyle');
 }
 async function transcribeLifestyle(){
  if(exampleMode){toast('示例访谈使用预设回答；真实语音请返回正式界面体验。');return;}
@@ -393,15 +393,15 @@ async function transcribeLifestyle(){
 async function sendInterviewAnswer(text){
  if(lifestyleSpeechBusy||capture.media.voiceRecorder||capture.media.voicePending||!text.trim()||!lifestyleOwner())return;
  if(text.length>2000){toast('请控制在 2000 字以内。');return;}
- const epoch=interviewEpoch;lifestyleText=text;lifestyleSpeechBusy=true;lifestyleSpeechError='';render();
+ const epoch=interviewEpoch;const turn={step:lifestyleStep,text,reply:''};interviewTurns.push(turn);lifestyleText='';lifestyleSpeechBusy=true;lifestyleSpeechError='';render();
  try{
    const response=await accountApi.interview(lifestyleQuestions[lifestyleStep].key,text);if(epoch!==interviewEpoch)return;
-   interviewReply=response.reply;
+   turn.reply=response.reply;
    if(!response.understood){lifestyleSpeechBusy=false;render();return;}
    lifestyleOwner().lifestyleDraft[lifestyleQuestions[lifestyleStep].key]={text,value:response.value};lifestyleText='';await capture.reset();
    lifestyleSpeechBusy=false;
    if(lifestyleStep<3){lifestyleStep++;render();}else await summarizeLifestyle();
- }catch(e){if(epoch===interviewEpoch){lifestyleSpeechError=e.message;lifestyleSpeechBusy=false;render();}}
+ }catch(e){if(epoch===interviewEpoch){lifestyleText=text;lifestyleSpeechError=e.message;lifestyleSpeechBusy=false;render();}}
 }
 async function summarizeLifestyle(){
  const owner=lifestyleOwner();if(!owner||lifestyleSpeechBusy)return;
@@ -423,7 +423,7 @@ async function confirmAccount(){
 }
 function lifestylePage(){
  if(!lifestyleOwner())return '';
- return interviewView({topbar,esc,icon,button,questions:lifestyleQuestions,answers:lifestyleViewing?state.account.lifestyle.answers:lifestyleOwner().lifestyleDraft,analysis:interviewAnalysis,step:lifestyleStep,review:lifestyleReview,viewing:lifestyleViewing,registering:!state.account,busy:lifestyleSpeechBusy||authBusy,error:lifestyleSpeechError,reply:interviewReply,text:lifestyleText,audioUrl:capture.media.audioUrl});
+ return interviewView({topbar,esc,icon,button,questions:lifestyleQuestions,answers:lifestyleViewing?state.account.lifestyle.answers:lifestyleOwner().lifestyleDraft,analysis:interviewAnalysis,step:lifestyleStep,review:lifestyleReview,viewing:lifestyleViewing,registering:!state.account,busy:lifestyleSpeechBusy||authBusy,error:lifestyleSpeechError,turns:interviewTurns,text:lifestyleText,audioUrl:capture.media.audioUrl});
 }
 
 function applyPage(){

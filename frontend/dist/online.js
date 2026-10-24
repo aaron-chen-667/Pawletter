@@ -1,3 +1,4 @@
+import {escapeDisplay as esc} from './display-text.js';
 import {createStationMedia} from './station-media.js';
 import {knowledgePanel,recordPanel,gallery,setCategory} from './station-records.js';
 import {workspaceFilters,recordFilters,applicationList,petList,summary,followupList,contactCard,applicantPage,followupNames,pair,chips} from './station-workspace.js';
@@ -13,7 +14,6 @@ const api=exampleMode?createStationExamples(window.sessionStorage):createPawlett
 const roleParam=new URL(location.href).searchParams.get('role');
 const requiredRole=['station','adopter'].includes(roleParam)?roleParam:null;
 const sender=createObservationSender(api),root=document.querySelector('#app');
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const topics={habits:'生活习惯',likes:'喜好与互动',diet:'饮食照护',health:'健康观察',other:'其他观察'};
 const statusLabels={queued:'已保存 · 等待整理',processing:'Agent 正在整理',archived:'已归档',failed:'整理失败 · 可以重试',withdrawn:'已撤回'};
 let user=null,pets=[],view='login',petId='',notes=[],records=[],messages=[],busy=false,error='',notice='',epoch=0,pollTimer,holding=false,finishing=false;

@@ -1,8 +1,8 @@
+import {escapeDisplay as esc} from './display-text.js';
 import {imageData,videoData} from './intake-media.js';
 import {createCaptureController} from './capture.js';
 import {createPressToTalk} from './press-to-talk.js';
 import {createOnboardingSpeech} from './onboarding-speech.js';
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function createIntakeUI({api,exampleMode,root,redraw,onDone}){
  let s,epoch=0,active=false,recordingStarted=false;
  const speech=createOnboardingSpeech();

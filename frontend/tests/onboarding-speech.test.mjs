@@ -17,3 +17,16 @@ test('leaving a question discards its late transcription',async()=>{
  const request=speech.transcribe('blob:recording');await ready;speech.cancel();
  resolve({ok:true,json:async()=>({text:'旧问题的回答'})});assert.equal(await request,null);
 });
+test('network failure preserves a retryable recording and never exposes browser errors',async()=>{
+ let uploads=0;const speech=createOnboardingSpeech(async url=>{
+  if(url==='blob:saved')return {blob:async()=>new Blob(['RIFF0000WAVE'],{type:'audio/wav'})};
+  if(++uploads===1)throw new TypeError('Failed to fetch');
+  return {ok:true,json:async()=>({text:'今天食欲正常。'})};
+ });
+ const failed=await speech.transcribe('blob:saved');assert.match(failed.error,/连接不上语音服务.*录音已保留/);assert.doesNotMatch(failed.error,/Failed to fetch/);
+ assert.equal((await speech.transcribe('blob:saved')).text,'今天食欲正常。');assert.equal(uploads,2);
+});
+test('unreadable local recording is distinguished from upload failure and sends nothing',async()=>{
+ const speech=createOnboardingSpeech(async()=>{throw new TypeError('Failed to fetch');});
+ const result=await speech.transcribe('blob:expired');assert.match(result.error,/录音暂时无法读取/);assert.doesNotMatch(result.error,/录音已保留|Failed to fetch/);
+});

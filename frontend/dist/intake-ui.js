@@ -30,7 +30,7 @@ const itemsFrom=text=>text.split(/(?<=[。！？；\n])/).map(t=>t.trim()).filte
 const sharedItems=items=>items.filter(i=>i.shared!==false);
 const descriptionOf=items=>knowledgeTopics.flatMap(q=>items.filter(i=>i.topic===q.key&&i.text.trim()).map(i=>i.text.trim().replace(/[^。！？；]$/,'$&。'))).join('');
 
-export function createIntakeUI({api,exampleMode,root,redraw,onDone,getDraftKey=()=>exampleMode?'example':'station',draftStore=createIntakeDraftStore(),speech=createOnboardingSpeech(),modeStore=localModeStore}){
+export function createIntakeUI({api,exampleMode,root,redraw,onDone,canWrite=()=>true,getDraftKey=()=>exampleMode?'example':'station',draftStore=createIntakeDraftStore(),speech=createOnboardingSpeech(),modeStore=localModeStore}){
  let s,owner,epoch=0,active=false,recordingStarted=false,preview=null,resume=false,mode=modeStore.get()==='text'?'text':'voice';
  const capture=createCaptureController({onChange:updateRecording,onError(message){if(s)s.error=message;updateRecording();}});
  const talk=createPressToTalk({capture,onChange:updateRecording,onSend:transcribe});
@@ -165,7 +165,7 @@ ${composerView()}
   finally{if(ticket===epoch&&state===s){s.busy=false;await persist();if(active)redraw();}}
  }
  async function addMedia(items){
-  if(!active||!s||locked()||s.commit)return;remember();const ticket=epoch,state=s;s.busy=true;s.error='';s.panel=false;redraw();
+  if(!active||!s||!canWrite()||locked()||s.commit)return;remember();const ticket=epoch,state=s;s.busy=true;s.error='';s.panel=false;redraw();
   let added=[];
   try{
    for(const item of items){
@@ -198,7 +198,7 @@ ${composerView()}
   dialog.onclose=()=>{dialog.remove();if(preview===dialog)preview=null;};dialog.showModal();
  }
  async function removeMedia(id){
-  if(!active||!s||locked()||s.commit)return;
+  if(!active||!s||!canWrite()||locked()||s.commit)return;
   s.media=s.media.filter(m=>m.id!==id);for(const t of s.turns)if(t.mediaIds)t.mediaIds=t.mediaIds.filter(m=>m!==id);
   await persist();redraw();if(hasContent(s))await organiseNow();
  }
@@ -216,6 +216,7 @@ ${composerView()}
   await persist();await organiseNow();
  }
  async function action(e){
+  if(!active||!s||!canWrite())return;
   const choice=e.target.closest('[data-review-choice]');
   if(choice&&s?.review&&!choice.disabled&&!locked()&&!s.commit){const field=choice.dataset.reviewChoice;s.review.fields[field]=choice.dataset.value;markEdited(field);await persist();redraw();return;}
   if(!active||!s)return;
@@ -286,7 +287,7 @@ ${composerView()}
   saving.busy=false;await persist(saving,savingOwner);if(active&&s===saving)redraw();
  }
  async function submit(e){
-  if(!active)return;
+  if(!active||!canWrite())return;
   if(e.target.dataset?.edit){e.preventDefault();e.stopImmediatePropagation();await saveEdit(e.target);return;}
   if(e.target.id!=='intake-confirm')return;e.preventDefault();e.stopImmediatePropagation();if(locked()||!canSave())return;
   const saving=s,savingOwner=owner,ticket=epoch;s.busy=true;s.error='';s.panel=false;redraw();await persist();

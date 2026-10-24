@@ -7,11 +7,11 @@ export function createOriginCheck(origin = defaultFrontendOrigin, additionalOrig
     const candidate = value.trim();
     let url;
     try { url = new URL(candidate); } catch { throw invalid(); }
-    if (!['https:', 'http:'].includes(url.protocol) || candidate.includes('*') || url.origin !== candidate) throw invalid();
-    return candidate;
+    if (!['https:', 'http:'].includes(url.protocol) || candidate.includes('*') || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw invalid();
+    return url.origin;
   }
-  if (typeof additionalOrigins !== 'string') throw invalid();
+  if (typeof origin !== 'string' || typeof additionalOrigins !== 'string') throw invalid();
   const extra = additionalOrigins.trim() ? additionalOrigins.split(',').map(validate) : [];
-  const allowed = new Set([validate(origin), ...extra]);
+  const allowed = new Set([...origin.split(',').map(validate), ...extra]);
   return requestOrigin => allowed.has(requestOrigin);
 }

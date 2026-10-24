@@ -252,3 +252,4 @@
 .record-status span{font-size:12px;color:var(--muted)}
 .record-visuals{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
 .record-visuals img,.record-visuals video{width:88px;height:88px;border-radius:10px;object-fit:cover;background:#eef0f6}
+.station-scope{margin-bottom:16px}.application-pair>span{min-width:0;max-width:100%}.pair-pet-name{display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}.pair-pet-name small{font-size:11px;color:#77839a}

@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
-import {authenticate,digest} from './auth.js';
+import {authenticate,canReadStation,digest} from './auth.js';
 import {transaction} from './db.js';
 import {assert} from './errors.js';
 import {petProfileSchema,defaultVoice} from './pet-agent.js';
@@ -92,7 +92,7 @@ export async function intakeRoutes(app,{db,ai,storage,origin}){
   });return reply.code(201).send(result);
  });
  app.get('/v1/pets/:id/intake',{preHandler:staff},async req=>{
-  const p=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];assert(p&&p.station_id===req.user.station_id,403,'STATION_REQUIRED');
+  const p=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];assert(p&&canReadStation(req.user,p.station_id),403,'STATION_REQUIRED');
   const source=(await db.query('SELECT source_text,ocr_text FROM pet_intakes WHERE pet_id=$1',[p.id])).rows[0]||{};
   const visuals=(await db.query('SELECT object_name,mime,caption,shared,created_at FROM media WHERE pet_id=$1 AND object_name LIKE $2 ORDER BY created_at DESC,object_name',[p.id,`pets/${p.id}/visual/%`])).rows.map(m=>({url:`${origin}/v1/pets/${p.id}/visual/${m.object_name.split('/').pop()}`,mime:m.mime,caption:m.caption,shared:m.shared,createdAt:m.created_at}));
   const documents=(await db.query('SELECT object_name,mime,size,caption,created_at FROM media WHERE pet_id=$1 AND object_name LIKE $2 ORDER BY object_name',[p.id,`pets/${p.id}/document/%`])).rows.map(m=>({url:`${origin}/v1/pets/${p.id}/document/${m.object_name.split('/').pop()}`,name:m.caption,mime:m.mime,size:m.size,createdAt:m.created_at}));
@@ -121,7 +121,7 @@ export async function intakeRoutes(app,{db,ai,storage,origin}){
  app.get('/v1/pets/:id/visual/:slot',async(req,reply)=>{
   assert(/^\d{1,3}$/.test(req.params.slot),404,'MEDIA_NOT_FOUND');const p=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];assert(p,404,'PET_NOT_FOUND');
   const m=(await db.query('SELECT * FROM media WHERE pet_id=$1 AND object_name=$2',[p.id,`pets/${p.id}/visual/${req.params.slot}`])).rows[0];assert(m,404,'MEDIA_NOT_FOUND');
-  if(!p.published||!m.shared){const user=await authenticate(db,req);assert(user.station_id===p.station_id,403,'STATION_REQUIRED');}
+  if(!p.published||!m.shared){const user=await authenticate(db,req);assert(canReadStation(user,p.station_id),403,'STATION_REQUIRED');}
   return reply.header('Cache-Control','private, no-store').type(m.mime).send(await storage.read(m.object_name));
  });
 }

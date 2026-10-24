@@ -20,6 +20,7 @@ async function page(t,{transcribe=async()=>({text:'今天食欲正常。'}),lose
   if(/^(blob|data):/.test(String(url)))return originalFetch(url,options);
   const path=new URL(url).pathname,body=typeof options.body==='string'?JSON.parse(options.body):undefined;
   if(path.endsWith('/login'))return Response.json({token:'test',user:{id:'staff',role:'station',stationId:'s1'}});
+  if(path==='/v1/stations')return Response.json({stations:[{id:'s1',name:'测试救助站'}]});
   if(path==='/v1/pets')return Response.json({pets});
   if(path==='/v1/applications')return Response.json({applications:[]});
   if(path==='/v1/followups')return Response.json({followups:[]});

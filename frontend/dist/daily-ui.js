@@ -159,7 +159,7 @@ export function createDailyUI({root,redraw,exampleMode,createSender,speech,examp
   if(e.target.closest('#daily-record')){if(!e.target.closest('#daily-record').disabled)await toggleRecording();return;}
   if(e.target.closest('[data-daily=cancel-voice]')){talk.cancel();redraw();return;}
   const b=e.target.closest('[data-daily]');if(!b||b.disabled)return;const a=b.dataset.daily;
-  if(a==='pick'){select(b.dataset.id);redraw();return;}
+  if(a==='pick'){if(!pets.some(p=>p.id===b.dataset.id))return;select(b.dataset.id);redraw();return;}
   if(a==='save'){await save();return;}
   if(locked())return;remember();
   if(a==='change-pet'&&!started()){s={picking:true};sender=null;redraw();return;}

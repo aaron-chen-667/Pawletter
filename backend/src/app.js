@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { randomUUID } from 'node:crypto';
 import { z, ZodError } from 'zod';
-import { authenticate, digest, login } from './auth.js';
+import { authenticate, canReadAllStations, canReadStation, digest, login } from './auth.js';
 import { ApiError, assert } from './errors.js';
 import { transaction } from './db.js';
 import { processOne } from './worker.js';
@@ -43,11 +43,26 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   const auth = async req => { req.user = await authenticate(db,req); };
   await followupRoutes(app,{db});
   await intakeRoutes(app,{db,ai,storage,origin:apiOrigin});
-  async function petFor(user,id,write=false) {
+  async function findPet(id) {
     const pet = (await db.query('SELECT * FROM pets WHERE id=$1',[id])).rows[0];
     assert(pet,404,'PET_NOT_FOUND');
+    return pet;
+  }
+  async function petFor(user,id,write=false) {
+    const pet = await findPet(id);
     if (write) assert(user.role==='station' && user.station_id===pet.station_id,403,'STATION_REQUIRED');
-    else assert(pet.published || user.station_id===pet.station_id,404,'PET_NOT_FOUND');
+    else assert(pet.published || canReadStation(user,pet.station_id),404,'PET_NOT_FOUND');
+    return pet;
+  }
+  async function stationPetFor(user,id) {
+    const pet = await findPet(id);
+    assert(canReadStation(user,pet.station_id),403,'STATION_REQUIRED');
+    return pet;
+  }
+  async function chatPetFor(user,id) {
+    const pet = await findPet(id);
+    // Cross-station archive access does not expand the existing chat audience.
+    assert(pet.published || user.station_id===pet.station_id,404,'PET_NOT_FOUND');
     return pet;
   }
   const audit = (client,user,action,id) => client.query('INSERT INTO audit_events(id,actor_id,action,target_id) VALUES($1,$2,$3,$4)',[randomUUID(),user.id,action,id]);
@@ -101,9 +116,13 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     return login(db,body.username,body.password);
   });
   app.post('/v1/auth/logout',{preHandler:auth},async req=>{await db.query('DELETE FROM sessions WHERE token_hash=$1',[digest(req.headers.authorization.slice(7))]);return {ok:true};});
-  app.get('/v1/me',{preHandler:auth},async req=>({id:req.user.id,role:req.user.role,stationId:req.user.station_id}));
+  app.get('/v1/me',{preHandler:auth},async req=>({id:req.user.id,role:req.user.role,stationId:req.user.station_id,canReadAllStations:canReadAllStations(req.user)}));
+  app.get('/v1/stations',{preHandler:auth},async req=>{
+    assert(req.user.role==='station',403,'STATION_REQUIRED');
+    return {stations:(await db.query('SELECT id,name FROM stations WHERE id=$1 OR $2::boolean ORDER BY name,id',[req.user.station_id,canReadAllStations(req.user)])).rows};
+  });
   app.get('/v1/catalog',async()=>({pets:(await db.query("SELECT p.*,s.name AS station_name FROM pets p JOIN stations s ON s.id=p.station_id WHERE p.published=true AND COALESCE((p.profile->>'internal')::boolean,false)=false AND p.name NOT LIKE '联调·%' ORDER BY p.created_at DESC LIMIT 100")).rows.map(row=>({...publicPet(row),stationName:row.station_name}))}));
-  app.get('/v1/pets',{preHandler:auth},async req=>({pets:(await db.query(req.user.role==='station'?'SELECT * FROM pets WHERE station_id=$1 ORDER BY created_at DESC':'SELECT * FROM pets WHERE published=true OR station_id=$1 ORDER BY created_at DESC LIMIT 100',[req.user.station_id])).rows.map(publicPet)}));
+  app.get('/v1/pets',{preHandler:auth},async req=>({pets:(await db.query(req.user.role==='station'?'SELECT * FROM pets WHERE station_id=$1 OR $2::boolean ORDER BY created_at DESC':'SELECT * FROM pets WHERE published=true OR station_id=$1 ORDER BY created_at DESC LIMIT 100',req.user.role==='station'?[req.user.station_id,canReadAllStations(req.user)]:[req.user.station_id])).rows.map(publicPet)}));
   app.post('/v1/pets',{preHandler:auth},async(req,reply)=>{
     assert(req.user.role==='station',403,'STATION_REQUIRED');
     const body = z.object({name:text(80),profile:petProfileSchema,published:z.boolean().default(false)}).strict().parse(req.body);
@@ -133,7 +152,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   });
   app.get('/v1/media/:id',{preHandler:auth},async(req,reply)=>{
     const media=(await db.query('SELECT * FROM media WHERE id=$1',[req.params.id])).rows[0];assert(media,404,'MEDIA_NOT_FOUND');
-    await petFor(req.user,media.pet_id,true);
+    await stationPetFor(req.user,media.pet_id);
     return reply.type(media.mime).send(await storage.read(media.object_name));
   });
   app.post('/v1/pets/:id/observations',{preHandler:auth,bodyLimit:20*1024*1024},async(req,reply)=>{
@@ -163,7 +182,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     return reply.code(result.duplicate?200:202).send(result);
   });
   app.get('/v1/pets/:id/observations',{preHandler:auth},async req=>{
-    await petFor(req.user,req.params.id,true);
+    await stationPetFor(req.user,req.params.id);
     const q=z.object({q:z.string().max(200).default(''),status:z.enum(['all','archived','processing','failed','withdrawn']).default('all'),from:z.union([z.iso.date(),z.literal('')]).default(''),to:z.union([z.iso.date(),z.literal('')]).default(''),order:z.enum(['asc','desc']).default('desc'),id:z.string().max(100).default('')}).parse(req.query);
     // Records sort and filter by the day the event happened, falling back to the entry day.
     const day="COALESCE(o.observed_on,(o.created_at AT TIME ZONE 'Asia/Shanghai')::date)",dir=q.order==='asc'?'ASC':'DESC';
@@ -189,21 +208,21 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     WHERE k.pet_id=$1 AND o.status='archived' AND (o.share_with_agent=true OR $2::boolean=true)
     ORDER BY CASE WHEN $3::text[] IS NULL THEN 0 WHEN k.topic=ANY($3::text[]) OR k.quote ~ $4::text THEN 0 ELSE 1 END,
       o.created_at DESC,k.id LIMIT 100`,[petId,includePrivate,topics,topics?.map(topic=>topicWords[topic]).filter(Boolean).join('|')||'(?!)'])).rows;}
-  app.get('/v1/pets/:id/knowledge',{preHandler:auth},async req=>{const pet=await petFor(req.user,req.params.id);return {notes:await notesFor(pet.id,req.user.station_id===pet.station_id)};});
+  app.get('/v1/pets/:id/knowledge',{preHandler:auth},async req=>{const pet=await petFor(req.user,req.params.id);return {notes:await notesFor(pet.id,canReadStation(req.user,pet.station_id))};});
   app.get('/v1/pets/:id/chat',{preHandler:auth},async req=>{
-    const pet=await petFor(req.user,req.params.id);
+    const pet=await chatPetFor(req.user,req.params.id);
     const rows=(await db.query('SELECT question,answer,citations,created_at FROM chats WHERE user_id=$1 AND pet_id=$2 ORDER BY created_at DESC LIMIT 30',[req.user.id,pet.id])).rows.reverse();
     return {messages:rows.flatMap(row=>[...(row.question?[{from:'user',text:row.question,at:row.created_at}]:[]),{from:'pet',text:row.answer,citations:row.citations,at:row.created_at}])};
   });
   app.post('/v1/pets/:id/chat',{preHandler:auth,config:{rateLimit:{max:15,timeWindow:'1 minute'}}},async req=>{
-    const pet=await petFor(req.user,req.params.id), {question}=z.object({question:text(2000)}).strict().parse(req.body);
+    const pet=await chatPetFor(req.user,req.params.id), {question}=z.object({question:text(2000)}).strict().parse(req.body);
     const topics=Object.entries(topicWords).filter(([,pattern])=>new RegExp(pattern).test(question)).map(([topic])=>topic);
     const agent=await readAgent(db,pet);
     const notes=await notesFor(pet.id,false,topics.length?topics:null), result=await ai.answer({pet,agent,notes:notes.slice(0,30),question});
     // Re-read after slow inference: withdrawn/corrected material must not escape in a late answer.
     const active=await notesFor(pet.id,false,topics.length?topics:null), activeIds=new Set(active.map(n=>n.id));
     assert(notes.slice(0,30).every(n=>activeIds.has(n.id)),409,'KNOWLEDGE_CHANGED_RETRY');
-    const latest=await petFor(req.user,pet.id),latestAgent=await readAgent(db,latest);
+    const latest=await chatPetFor(req.user,pet.id),latestAgent=await readAgent(db,latest);
     assert(latestAgent.revision===agent.revision&&latest.name===pet.name&&JSON.stringify(latest.profile)===JSON.stringify(pet.profile),409,'KNOWLEDGE_CHANGED_RETRY');
     assert(Array.isArray(result.citationIds) && result.citationIds.every(id=>notes.slice(0,30).some(n=>n.id===id)),502,'AI_INVALID_ANSWER');
     const citations=active.filter(n=>result.citationIds.includes(n.id));

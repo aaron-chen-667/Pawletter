@@ -82,7 +82,7 @@ test('untrusted, missing and near-match origins cannot invoke anonymous work or 
 });
 
 test('invalid configured origins fail before the app is created',async()=>{
- const invalid=['','*','https://*.example.com','null','file:///tmp/example','https://example.com/','https://example.com/path','https://user:password@example.com','https://example.com?all=1','https://example.com#fragment','https://example.com,https://other.example.com',true];
+ const invalid=['','*','https://*.example.com','null','file:///tmp/example','https://example.com/path','https://user:password@example.com','https://example.com?all=1','https://example.com#fragment',true];
  for(const origin of invalid)await assert.rejects(createApp({db:{},ai:{},storage:{},origin}),/Frontend origins must be exact/);
  for(const additionalOrigins of ['*',`${preview},`,` ,${preview}`,`${preview},https://*.example.com`,`${preview},https://example.com/path`,[preview]]){
   await assert.rejects(createApp({db:{},ai:{},storage:{},additionalOrigins}),/Frontend origins must be exact/);
@@ -94,5 +94,15 @@ test('an existing custom primary origin remains usable with a comma-separated ad
  const app=await createApp({db:{},ai:{},storage:{},origin:primary,additionalOrigins:`${preview},${second}`});
  try{
   for(const origin of [primary,preview,second])assert.equal((await preflight(app,origin)).headers['access-control-allow-origin'],origin);
+ }finally{await app.close();}
+});
+
+
+test('primary origin lists and additional origins combine under one normalized policy',async()=>{
+ const second='https://second-preview.example.com';
+ const app=await createApp({db:{},ai:{},storage:{},origin:`${production}/,${preview}:443`,additionalOrigins:second});
+ try{
+  for(const origin of [production,preview,second])assert.equal((await preflight(app,origin)).headers['access-control-allow-origin'],origin);
+  assert.equal((await preflight(app,`${second}.evil.example`)).headers['access-control-allow-origin'],undefined);
  }finally{await app.close();}
 });

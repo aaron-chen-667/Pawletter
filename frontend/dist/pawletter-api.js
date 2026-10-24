@@ -13,6 +13,7 @@ export function createPawletterClient(baseUrl, fetcher=fetch) {
     async login(username,password){const result=await call('/v1/auth/login',{method:'POST',body:{username,password}});clearMedia();token=result.token;return {user:result.user,expiresAt:result.expiresAt};},
     async logout(){clearMedia();try{await call('/v1/auth/logout',{method:'POST'});}finally{token=null;clearMedia();}},
     me:()=>call('/v1/me'),
+    stations:()=>call('/v1/stations'),
     async pets(){const data=await call('/v1/pets');await Promise.all(data.pets.map(async p=>{if(p.profile?.photoUrl)p.profile.photoUrl=await visual(p.profile.photoUrl);}));return data;},
     followups:()=>call('/v1/followups'),
     createFollowup:(body,key)=>call('/v1/followups',{method:'POST',body,headers:{'Idempotency-Key':key}}),

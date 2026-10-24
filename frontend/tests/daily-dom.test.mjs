@@ -6,10 +6,13 @@ const pad=n=>String(n).padStart(2,'0');
 const daysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
 let run=0;
 
-async function page(t,{transcribe=async()=>({text:'今天食欲正常。'})}={}){
+async function page(t,{transcribe=async()=>({text:'今天食欲正常。'}),loseSecondResponse=false,rejectSecondOnce=false}={}){
  const dom=new JSDOM('<div id="app"></div>',{url:'https://pawletter.invalid/?mode=online&role=station',pretendToBeVisual:true}),w=dom.window,originalFetch=globalThis.fetch;
  const pets=[{id:'pet-1',name:'橘子',stationId:'s1',profile:{species:'cat'},published:false},{id:'pet-2',name:'阿灰',stationId:'s1',profile:{species:'cat'},published:false}];
- const calls={saves:[],speech:0};let rows=[];
+ const calls={saves:[],speech:0,processed:[]};let rows=[],lost=false,rejected=false;const accepted=new Map();
+ const jpeg='data:image/jpeg;base64,/9j/2Q==';
+ w.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){}});w.HTMLCanvasElement.prototype.toDataURL=()=>jpeg;
+ class Image{naturalWidth=100;naturalHeight=100;set src(value){queueMicrotask(()=>this.onload());}}
  class Recorder{static isTypeSupported(){return true;}constructor(){Recorder.latest=this;this.state='inactive';this.mimeType='audio/wav';}start(){this.state='recording';}stop(){this.state='inactive';this.ondataavailable({data:new Blob(['RIFF0000WAVE'])});this.onstop();}}
  w.MediaRecorder=Recorder;w.HTMLElement.prototype.setPointerCapture=()=>{};
  Object.defineProperty(w.navigator,'mediaDevices',{value:{getUserMedia:async()=>({getTracks:()=>[{stop(){}}]})}});
@@ -22,87 +25,163 @@ async function page(t,{transcribe=async()=>({text:'今天食欲正常。'})}={})
   if(path==='/v1/followups')return Response.json({followups:[]});
   if(path.endsWith('/transcribe')){calls.speech++;try{return Response.json(await transcribe(calls.speech));}catch(e){throw e;}}
   if(path.endsWith('/observations')&&options.method==='POST'){
-   calls.saves.push({path,body,key:options.headers['Idempotency-Key']});const id='obs-'+calls.saves.length;
+   const key=options.headers['Idempotency-Key'];calls.saves.push({path,body,key});if(accepted.has(key))return Response.json({id:accepted.get(key),duplicate:true});if(rejectSecondOnce&&accepted.size===1&&!rejected){rejected=true;return Response.json({error:'INVALID_INPUT'},{status:400});}const id='obs-'+(accepted.size+1);accepted.set(key,id);
    if(body.replacesId)rows=rows.map(r=>r.id===body.replacesId?{...r,status:'withdrawn'}:r);
-   rows=[{id,original_text:body.text,share_with_agent:body.shareWithAgent,status:'queued',created_at:new Date().toISOString(),observed_on:body.observedOn,replaces_id:body.replacesId||null,visuals:[]},...rows];
+   rows=[{id,pet_id:path.split('/')[3],original_text:body.text,share_with_agent:body.shareWithAgent,status:'queued',created_at:new Date().toISOString(),observed_on:body.observedOn,replaces_id:body.replacesId||null,visuals:[]},...rows];
+   if(loseSecondResponse&&accepted.size===2&&!lost){lost=true;throw new TypeError('Failed to fetch');}
    return Response.json({id},{status:202});
   }
-  if(path.endsWith('/observations'))return Response.json({observations:rows});
-  if(path.endsWith('/process')){rows=rows.map(r=>r.status==='queued'?{...r,status:'archived'}:r);return Response.json({processed:true});}
+  if(path.endsWith('/observations'))return Response.json({observations:rows.filter(r=>r.pet_id===path.split('/')[3])});
+  if(path.endsWith('/process')){calls.processed.push(path);rows=rows.map(r=>r.status==='queued'?{...r,status:'archived'}:r);return Response.json({processed:true});}
   if(path.endsWith('/knowledge'))return Response.json({notes:[]});
   if(path.endsWith('/intake'))return Response.json({visuals:[],documents:[]});
   throw Error('Unexpected request: '+path);
  };
  const previous=new Map();
- for(const [key,value]of Object.entries({window:w,document:w.document,navigator:w.navigator,location:w.location,FormData:w.FormData,confirm:()=>true,fetch:fetcher,MediaRecorder:Recorder,FileReader:class {async readAsDataURL(blob){this.result=`data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString('base64')}`;this.onload();}}}))
+ for(const [key,value]of Object.entries({window:w,document:w.document,navigator:w.navigator,location:w.location,FormData:w.FormData,localStorage:w.localStorage,confirm:()=>true,fetch:fetcher,MediaRecorder:Recorder,Image,FileReader:class {async readAsDataURL(blob){this.result=`data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString('base64')}`;this.onload();}}}))
   {previous.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true});}
  t.after(()=>{dom.window.close();for(const [key,descriptor]of previous){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}});
  const q=s=>w.document.querySelector(s),click=s=>{assert.ok(q(s),`Missing ${s}`);q(s).click();};
  const until=async(predicate,message='Expected interface state was not reached')=>{for(let i=0;i<200&&!predicate();i++)await new Promise(r=>setTimeout(r,5));assert.ok(predicate(),message);};
- const type=value=>{const el=q('#daily-text');assert.ok(el,'Missing #daily-text');el.value=value;el.dispatchEvent(new w.Event('input',{bubbles:true}));};
+ const type=value=>{if(!q('#daily-text'))click('[data-daily=mode]');const el=q('#daily-text');assert.ok(el,'Missing #daily-text');el.value=value;el.dispatchEvent(new w.Event('input',{bubbles:true}));};
  await import(`../dist/online.js?daily=${++run}`);
  q('[name=username]').value='staff';q('[name=password]').value='not-a-real-password';q('#login-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
  await until(()=>q('.station-action-dock [data-live=voice]'));
- return {w,q,click,until,type,calls,Recorder};
+ const photo=async()=>{if(!q('[data-daily=album]'))click('[data-daily=attachments]');const input=q('#daily-album');Object.defineProperty(input,'files',{value:[new Blob(['test image'],{type:'image/jpeg'})]});input.dispatchEvent(new w.Event('change',{bubbles:true}));await until(()=>q('.daily-composer .daily-thumb img'));};
+ return {w,q,click,until,type,calls,Recorder,photo,jpeg};
 }
 
-test('from the workspace the rescuer picks a partner, records with a date and visibility, and lands on that partner',async t=>{
- const h=await page(t);
+async function enter(h,id='pet-1',typing=true){
  h.click('.station-action-dock [data-live=voice]');await h.until(()=>h.q('.daily-picker'));
- assert.match(h.q('.topbar-title').textContent,/给谁补充/);assert.equal(h.q('#daily-text'),null);
- h.click('[data-daily=pick][data-id=pet-2]');await h.until(()=>h.q('#daily-text'));
- assert.match(h.q('.daily-who').textContent,/阿灰/);assert.match(h.q('.daily-entry header').textContent,/阿灰 · 今天/);
- assert.equal(h.q('[data-daily=save]').disabled,true,'Nothing to save yet');
- h.type('今天第一次主动靠过来了，同事说昨晚也吃完了半碗。');
- assert.equal(h.q('.daily-who').disabled,true,'The partner stays fixed once the rescuer starts writing');
- h.click('[data-daily=sheet]');await h.until(()=>h.q('.daily-sheet'));h.click(`[data-daily=day][data-day="${daysAgo(1)}"]`);await h.until(()=>!h.q('.daily-sheet'));
- assert.match(h.q('.daily-entry header').textContent,/阿灰 · 昨天/);
- h.click('[data-daily=local]');await h.until(()=>h.q('[data-daily=local].on'));
- h.click('[data-daily=save]');await h.until(()=>h.q('.online-card.just-added'));
- assert.equal(h.calls.saves.length,1);const {body,path,key}=h.calls.saves[0];
- assert.equal(path,'/v1/pets/pet-2/observations');assert.ok(key);
- assert.deepEqual(body,{text:'今天第一次主动靠过来了，同事说昨晚也吃完了半碗。',shareWithAgent:false,observedOn:daysAgo(1)});
- assert.match(h.q('.topbar-title').textContent,/阿灰/);assert.match(h.q('#app').textContent,/已追加，正在整理进资料库/);
- assert.match(h.q('.online-card.just-added').textContent,/昨天 · 刚追加/);assert.match(h.q('.online-card.just-added').textContent,/仅本站可见/);
+ h.click(`[data-daily=pick][data-id="${id}"]`);await h.until(()=>h.q('.daily-flow'));if(typing&&!h.q('#daily-text')&&h.q('[data-daily=mode]'))h.click('[data-daily=mode]');
+}
+
+test('continuous additions stay with one pet and are only submitted after a combined review',async t=>{
+ const h=await page(t);await enter(h,'pet-2');
+ assert.equal(h.q('.topbar-title').textContent,'补充');assert.equal(h.q('[role=tab]'),null);
+ assert.equal(h.q('[data-daily=save]'),null);assert.equal(h.q('[data-daily=review]').disabled,true);
+ assert.match(h.q('[data-daily=sheet]').getAttribute('aria-label'),/未指定/);
+ h.type('它已经绝育了，之前忘了说。');h.click('[data-daily=add]');
+ assert.equal(h.q('#daily-text').value,'');assert.equal(h.calls.saves.length,0);assert.ok(h.q('.daily-entry'));
+ h.type('昨天第一次主动靠近了。');
+ h.click('[data-daily=sheet]');h.click(`[data-daily=day][data-day="${daysAgo(1)}"]`);h.click('[data-daily=local]');
+ h.click('[data-daily=review]');
+ assert.equal(h.calls.saves.length,0);assert.equal(h.q('#daily-text'),null);assert.match(h.q('[data-daily=save]').textContent,/2 条/);
+ h.click('[data-daily=continue]');assert.ok(h.q('#daily-text'));assert.equal(h.calls.saves.length,0);
+ h.click('[data-daily=review]');h.click('[data-daily=save]');await h.until(()=>h.q('.online-card.just-added'));
+ assert.equal(h.calls.saves.length,2);assert.ok(h.calls.saves.every(c=>c.path==='/v1/pets/pet-2/observations'));
+ assert.deepEqual(h.calls.saves.map(c=>c.body),[{text:'它已经绝育了，之前忘了说。',shareWithAgent:true},{text:'昨天第一次主动靠近了。',shareWithAgent:false,observedOn:daysAgo(1)}]);
+ assert.equal(new Set(h.calls.saves.map(c=>c.key)).size,2);assert.equal(h.calls.processed.length,2);
+ assert.match(h.q('.topbar-title').textContent,/阿灰/);assert.match(h.q('.online-card.just-added').textContent,/昨天 · 刚追加/);
 });
 
-test('from a partner profile the partner is already chosen',async t=>{
- const h=await page(t);
- h.click('[data-live=pets]');await h.until(()=>h.q('[data-live=pet]'));h.click('[data-live=pet][data-id=pet-1]');await h.until(()=>h.q('[data-live=voice][data-id=pet-1]'));
- h.click('[data-live=voice][data-id=pet-1]');await h.until(()=>h.q('#daily-text'));
- assert.equal(h.q('.daily-picker'),null);assert.match(h.q('.daily-who').textContent,/橘子/);
+test('review allows edits and removal without losing the next unfinished addition',async t=>{
+ const h=await page(t);await enter(h);h.type('它喜欢小球。');h.click('[data-daily=add]');
+ h.type('它喜欢羽毛玩具。');h.click('[data-daily=edit-entry]');
+ assert.equal(h.q('#daily-text').value,'它喜欢小球。');
+ h.type('它更喜欢羽毛玩具。');h.click('[data-daily=add]');
+ h.click('[data-daily=review]');assert.match(h.q('[data-daily=save]').textContent,/2 条/);
+ h.click('.daily-entry:last-child [data-daily=remove-entry]');
+ assert.equal(h.calls.saves.length,0);assert.match(h.q('[data-daily=save]').textContent,/1 条/);
+ h.click('[data-daily=save]');await h.until(()=>h.calls.saves.length===1);
+ assert.equal(h.calls.saves[0].body.text,'它更喜欢羽毛玩具。');
 });
 
-test('spoken words join the entry and a failed transcription keeps the recording for retry without saving',async t=>{
- const h=await page(t,{transcribe:async n=>{if(n===1)throw new TypeError('Failed to fetch');return {text:'今天食欲正常。'};}});
- h.click('.station-action-dock [data-live=voice]');await h.until(()=>h.q('[data-daily=pick]'));h.click('[data-daily=pick]');await h.until(()=>h.q('#daily-record'));
- h.type('早上量了体重。');
- h.click('#daily-record');await h.until(()=>h.Recorder.latest?.state==='recording'&&h.q('.daily-dock[data-state=rec]'));
- assert.ok(h.q('[data-daily=cancel-voice]'));
- h.click('#daily-record');await h.until(()=>h.q('audio')&&h.q('[data-daily=retry-speech]'));
- assert.equal(h.calls.saves.length,0);assert.equal(h.q('[data-daily=save]').disabled,true,'A pending recording must be resolved first');
+test('attachments preview beside the input and remain with their own additions, including media alone',async t=>{
+ const h=await page(t);await enter(h);h.type('平时喜欢玩羽毛。');await h.photo();
+ assert.ok(h.q('.daily-composer #daily-text'));assert.ok(h.q('.daily-composer .daily-thumb img'));assert.ok(h.q('.daily-composer [data-daily=attachments]'));assert.ok(h.q('.daily-composer [data-daily=mode]'));
+ h.click('[data-daily=add]');assert.ok(h.q('.daily-entry .daily-thumb img'));assert.equal(h.q('.daily-composer .daily-thumb'),null);
+ await h.photo();h.click('[data-daily=review]');assert.equal(h.calls.saves.length,0);h.click('[data-daily=save]');await h.until(()=>h.q('.online-card.just-added'));
+ assert.deepEqual(h.calls.saves.map(c=>c.body),[{text:'平时喜欢玩羽毛。',shareWithAgent:true,photos:[h.jpeg]},{text:'',shareWithAgent:true,photos:[h.jpeg]}]);
+});
+
+test('a lost response halfway through final confirmation retries only the unacknowledged item with its original key',async t=>{
+ const h=await page(t,{loseSecondResponse:true});await enter(h);
+ h.type('第一条补充。');h.click('[data-daily=add]');h.type('第二条补充。');h.click('[data-daily=review]');h.click('[data-daily=save]');
+ await h.until(()=>h.q('.daily-review-actions [role=alert]')?.textContent.includes('已保存 1/2'));
+ assert.equal(h.q('[data-daily=edit-entry]').disabled,true);
+ h.click('[data-live=home]');await h.until(()=>h.q('.station-action-dock'));await enter(h); // The pending draft is retained for this pet.
+ await h.until(()=>h.q('[data-daily=save]'));h.click('[data-daily=save]');await h.until(()=>h.q('.online-card.just-added'));
+ assert.equal(h.calls.saves.length,3);assert.deepEqual(h.calls.saves[1],h.calls.saves[2]);assert.notEqual(h.calls.saves[0].key,h.calls.saves[1].key);
+ assert.equal(h.calls.processed.length,2);
+});
+
+test('unfinished additions survive in-app navigation and stay isolated between pets',async t=>{
+ const h=await page(t);await enter(h);h.type('橘子的第一条。');h.click('[data-daily=add]');h.type('还没加入的内容。');
+ h.click('[data-live=home]');await h.until(()=>h.q('.station-action-dock'));await enter(h,'pet-2');
+ assert.equal(h.q('.daily-entry'),null);assert.equal(h.q('#daily-text').value,'');
+ h.click('[data-live=home]');await h.until(()=>h.q('.station-action-dock'));await enter(h);
+ assert.match(h.q('.daily-entry').textContent,/橘子的第一条/);assert.equal(h.q('#daily-text').value,'还没加入的内容。');assert.equal(h.calls.saves.length,0);
+});
+
+test('profile entry already selects the current pet',async t=>{
+ const h=await page(t);h.click('[data-live=pets]');await h.until(()=>h.q('[data-live=pet]'));h.click('[data-live=pet][data-id=pet-1]');await h.until(()=>h.q('[data-live=voice][data-id=pet-1]'));
+ h.click('[data-live=voice][data-id=pet-1]');await h.until(()=>h.q('.daily-flow'));assert.equal(h.q('.daily-picker'),null);assert.match(h.q('.daily-who').textContent,/橘子/);
+});
+
+test('failed transcription retains the audio for retry without adding or submitting a record',async t=>{
+ const h=await page(t,{transcribe:async n=>{if(n===1)throw new TypeError('Failed to fetch');return {text:'今天食欲正常。'};}});await enter(h);
+ h.type('早上量了体重。');h.click('[data-daily=mode]');h.click('#daily-record');await h.until(()=>h.Recorder.latest?.state==='recording');
+ h.click('#daily-record');await h.until(()=>h.q('[data-daily=retry-speech]')&&!h.q('[data-daily=retry-speech]').disabled);
+ assert.equal(h.calls.saves.length,0);assert.equal(h.q('[data-daily=add]').disabled,true);assert.equal(h.q('[data-daily=review]').disabled,true);
  h.click('[data-daily=retry-speech]');await h.until(()=>h.q('#daily-text')?.value==='早上量了体重。\n今天食欲正常。');
- assert.equal(h.q('audio'),null);assert.equal(h.calls.saves.length,0);
+ assert.equal(h.q('audio'),null);assert.equal(h.calls.saves.length,0);h.click('[data-daily=add]');assert.ok(h.q('.daily-entry'));assert.ok(h.q('.intake-talk-button'));
 });
 
-test('a correction starts from the old record, keeps its date and visibility, and cannot add media',async t=>{
- const h=await page(t);
- h.click('.station-action-dock [data-live=voice]');await h.until(()=>h.q('[data-daily=pick]'));h.click('[data-daily=pick][data-id=pet-1]');await h.until(()=>h.q('#daily-text'));
- h.type('它不吃罐头。');h.click('[data-daily=sheet]');await h.until(()=>h.q('.daily-sheet'));h.click(`[data-daily=day][data-day="${daysAgo(2)}"]`);
- h.click('[data-daily=local]');h.click('[data-daily=save]');await h.until(()=>h.q('[data-live=correct]'));
- h.click('[data-live=correct]');await h.until(()=>h.q('.daily-entry.correcting'));
- assert.match(h.q('.topbar-title').textContent,/更正这条记录/);assert.match(h.q('.daily-original').textContent,/它不吃罐头/);assert.equal(h.q('#daily-text').value,'它不吃罐头。');
- assert.match(h.q('.daily-date-chip').textContent,/前天/);assert.equal(h.q('[data-daily=panel]'),null);
- h.type('它只是不吃鸡肉味罐头。');h.click('[data-daily=save]');await h.until(()=>h.calls.saves.length===2&&h.q('.online-card.just-added'));
+test('correction retains date and visibility, is reviewed, and replaces exactly one original record',async t=>{
+ const h=await page(t);await enter(h);h.type('它不吃罐头。');h.click('[data-daily=sheet]');h.click(`[data-daily=day][data-day="${daysAgo(2)}"]`);h.click('[data-daily=local]');h.click('[data-daily=review]');h.click('[data-daily=save]');await h.until(()=>h.q('[data-live=correct]'));
+ h.click('[data-live=correct]');await h.until(()=>h.q('#daily-text'));
+ assert.equal(h.q('#daily-text').value,'它不吃罐头。');assert.match(h.q('.daily-date-chip').textContent,/前天/);assert.equal(h.q('[data-daily=album]'),null);
+ h.type('它只是不吃鸡肉味罐头。');h.click('[data-daily=add]');assert.equal(h.calls.saves.length,1);
+ h.click('[data-daily=continue]');assert.equal(h.q('#daily-text').value,'它只是不吃鸡肉味罐头。');h.click('[data-daily=add]');h.click('[data-daily=save]');await h.until(()=>h.calls.saves.length===2&&h.q('.online-card.just-added'));
  assert.deepEqual(h.calls.saves[1].body,{text:'它只是不吃鸡肉味罐头。',shareWithAgent:false,replacesId:'obs-1',observedOn:daysAgo(2)});
- assert.match(h.q('.online-card.just-added').textContent,/更正过/);
 });
 
-test('a future date cannot be chosen',async t=>{
- const h=await page(t);
- h.click('.station-action-dock [data-live=voice]');await h.until(()=>h.q('[data-daily=pick]'));h.click('[data-daily=pick]');await h.until(()=>h.q('#daily-text'));
- h.click('[data-daily=sheet]');await h.until(()=>h.q('#daily-date'));
- const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);const input=h.q('#daily-date');assert.equal(input.max,daysAgo(0));
- input.value=`${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}`;input.dispatchEvent(new h.w.Event('change',{bubbles:true}));
- assert.match(h.q('.daily-date-chip').textContent,/今天/);
+test('dates are optional and a future event date cannot be selected',async t=>{
+ const h=await page(t);await enter(h);h.click('[data-daily=sheet]');const input=h.q('#daily-date');assert.equal(input.max,daysAgo(0));
+ const tomorrow=new Date(Date.now()+2*86400000);input.value=`${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}`;input.dispatchEvent(new h.w.Event('change',{bubbles:true}));
+ assert.match(h.q('.daily-date-chip').textContent,/日期/);h.click(`[data-daily=day][data-day="${daysAgo(0)}"]`);assert.match(h.q('.daily-date-chip').textContent,/今天/);
+ h.click('[data-daily=sheet]');h.click('[data-daily=day][data-day=""]');assert.match(h.q('.daily-date-chip').textContent,/日期/);
+});
+
+
+test('example quota errors retain the last persisted records and retry creates only one addition',async()=>{
+ const {createStationExamples}=await import('../dist/station-examples.js');let fail=true,persisted;
+ const api=createStationExamples({getItem:()=>null,setItem:(_,value)=>{if(fail)throw Error('quota');persisted=value;}});
+ const petId=(await api.pets()).pets[0].id,before=(await api.observations(petId)).observations.length;
+ await assert.rejects(api.submitObservation(petId,{text:'配额测试',photos:['data:image/jpeg;base64,AAAA']},'quota-key'),/EXAMPLE_STORAGE_FULL/);
+ assert.equal((await api.observations(petId)).observations.length,before);assert.equal(persisted,undefined);
+ fail=false;const saved=await api.submitObservation(petId,{text:'配额测试'},'quota-key');assert.equal((await api.submitObservation(petId,{text:'配额测试'},'quota-key')).id,saved.id);
+ assert.equal((await api.observations(petId)).observations.length,before+1);assert.ok(persisted);
+});
+
+
+test('a rejected later entry remains editable while already saved entries stay fixed',async t=>{
+ const h=await page(t,{rejectSecondOnce:true});await enter(h);h.type('已确认的第一条。');h.click('[data-daily=add]');h.type('需要改的第二条。');h.click('[data-daily=review]');h.click('[data-daily=save]');
+ await h.until(()=>h.q('.daily-review-actions [role=alert]')?.textContent.includes('已保存 1/2'));
+ assert.equal(h.q('.daily-entry:first-child [data-daily=edit-entry]').disabled,true);assert.equal(h.q('.daily-entry:last-child [data-daily=edit-entry]').disabled,false);
+ h.click('.daily-entry:last-child [data-daily=edit-entry]');h.type('修改后的第二条。');h.click('[data-daily=add]');h.click('[data-daily=review]');h.click('[data-daily=save]');await h.until(()=>h.q('.online-card.just-added'));
+ assert.equal(h.calls.saves.length,3);assert.equal(h.calls.saves[2].body.text,'修改后的第二条。');assert.notEqual(h.calls.saves[1].key,h.calls.saves[2].key);assert.equal(h.calls.processed.length,2);
+});
+
+
+test('voice and typing share the intake composer while preserving unsent text, media and options',async t=>{
+ const h=await page(t);await enter(h,'pet-1',false);
+ assert.ok(h.q('.intake-composer.voice .intake-talk-button'));
+ assert.equal(h.q('#daily-text'),null);
+ h.click('[data-daily=mode]');h.type('样式核对：之前忘了说，它会用猫砂。');await h.photo();
+ h.click('[data-daily=local]');h.click('[data-daily=mode]');
+ assert.ok(h.q('.intake-caption.editable #daily-text'));
+ assert.match(h.q('#daily-text').value,/会用猫砂/);
+ assert.ok(h.q('.daily-composer .daily-thumb img'));
+ assert.equal(h.q('[data-daily=local]').getAttribute('aria-pressed'),'true');
+ h.type('');assert.ok(h.q('#daily-text'),'Clearing a spoken draft keeps it editable');
+ assert.equal(h.q('[data-daily=add]').disabled,false,'A photo can still be added without text');
+ h.click('[data-daily=mode]');h.click('[data-daily=remove-media]');
+ assert.equal(h.w.document.querySelectorAll('[data-daily=attachments]').length,1);
+ h.type('最终保留这条。');h.click('[data-daily=add]');
+ assert.ok(h.q('.daily-entry .intake-bubble.me'));
+ assert.equal(h.calls.saves.length,0);
+ h.click('[data-daily=review]');h.click('[data-daily=save]');await h.until(()=>h.calls.saves.length===1);
+ assert.deepEqual(h.calls.saves[0].body,{text:'最终保留这条。',shareWithAgent:false});
 });

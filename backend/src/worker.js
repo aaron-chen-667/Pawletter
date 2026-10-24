@@ -12,13 +12,14 @@ export async function processOne({db, ai, storage}, observationId = null) {
   const task = rows[0]; if (!task) return {processed:false};
   try {
     let transcript = task.transcript || task.original_text;
-    if (!transcript) {
+    if (!transcript && task.media_id) {
       const media = (await db.query('SELECT * FROM media WHERE id=$1 AND pet_id=$2',[task.media_id,task.pet_id])).rows[0];
       if (!media) throw Object.assign(new Error(),{code:'MEDIA_MISSING'});
       transcript = await ai.transcribe(await storage.read(media.object_name), media.mime);
       await db.query("UPDATE observations SET transcript=$1 WHERE id=$2 AND lease_token=$3 AND status='processing'",[transcript,task.id,lease]);
     }
-    const notes = validateExtraction({items:await ai.extract(transcript)}, transcript);
+    // Media without a caption is kept as evidence; do not invent textual facts from it.
+    const notes = transcript ? validateExtraction({items:await ai.extract(transcript)}, transcript) : [];
     await transaction(db, async client => {
       const valid = (await client.query("SELECT id FROM observations WHERE id=$1 AND lease_token=$2 AND status='processing' FOR UPDATE",[task.id,lease])).rows[0];
       if (!valid) return; // Withdrawals and newer workers invalidate this lease.

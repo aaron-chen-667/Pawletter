@@ -17,7 +17,7 @@ import {intakeRoutes,storeVisuals,jpegImage} from './intake.js';
 const text = max => z.string().trim().min(1).max(max);
 // observedOn is when it happened (Beijing calendar day, never in the future); created_at stays the entry time.
 const beijingToday = () => new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Shanghai'});
-const observationBody = z.object({text:z.string().trim().max(12000).default(''),mediaId:z.string().uuid().optional(),shareWithAgent:z.boolean().default(false),replacesId:z.string().uuid().optional(),observedOn:z.iso.date().refine(d=>d>='2000-01-01'&&d<=beijingToday(),'OBSERVED_ON_INVALID').optional(),photos:z.array(jpegImage).max(3).default([]),video:z.string().max(14500000).optional()}).strict().refine(v=>!!v.text || !!v.mediaId,'Text or audio is required');
+const observationBody = z.object({text:z.string().trim().max(12000).default(''),mediaId:z.string().uuid().optional(),shareWithAgent:z.boolean().default(false),replacesId:z.string().uuid().optional(),observedOn:z.iso.date().refine(d=>d>='2000-01-01'&&d<=beijingToday(),'OBSERVED_ON_INVALID').optional(),photos:z.array(jpegImage).max(3).default([]),video:z.string().max(14500000).optional()}).strict().refine(v=>!!v.text || !!v.mediaId || v.photos.length>0 || !!v.video,'Content is required');
 const publicPet = row => ({id:row.id,name:row.name,stationId:row.station_id,published:row.published,profile:row.profile});
 const topicWords={health:'健康|肠胃|软便|呕吐|生病|疫苗|绝育|过敏|食欲',diet:'饮食|吃|喝|粮|喂|罐头',habits:'作息|习惯|睡|独处|厕所|猫砂|散步',likes:'喜欢|玩|抱|摸|怕|躲|亲近|互动'};
 export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin = 'https://pawletter-adoption-h5.chenaaron668.chatgpt.site', logger = false }) {
@@ -151,7 +151,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
         await client.query("UPDATE observations SET status='withdrawn',lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1",[old.id]);
       }
       const id=randomUUID();
-      await client.query('INSERT INTO observations(id,pet_id,author_id,idempotency_key,request_hash,original_text,media_id,share_with_agent,replaces_id,observed_on) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[id,req.params.id,req.user.id,key,hash,body.text,body.mediaId||null,body.shareWithAgent,body.replacesId||null,body.observedOn||null]);
+      await client.query('INSERT INTO observations(id,pet_id,author_id,idempotency_key,request_hash,original_text,media_id,share_with_agent,replaces_id,observed_on,has_visuals) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[id,req.params.id,req.user.id,key,hash,body.text,body.mediaId||null,body.shareWithAgent,body.replacesId||null,body.observedOn||null,body.photos.length>0||!!body.video]);
       // A correction keeps the photos of the record it replaces.
       if(body.replacesId)await client.query('UPDATE media SET observation_id=$1 WHERE observation_id=$2',[id,body.replacesId]);
       await storeVisuals(client,storage,{petId:req.params.id,ownerId:req.user.id,observationId:id,photos:body.photos,video:body.video},objects);
@@ -165,7 +165,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     const q=z.object({q:z.string().max(200).default(''),status:z.enum(['all','archived','processing','failed','withdrawn']).default('all'),from:z.union([z.iso.date(),z.literal('')]).default(''),to:z.union([z.iso.date(),z.literal('')]).default(''),order:z.enum(['asc','desc']).default('desc'),id:z.string().max(100).default('')}).parse(req.query);
     // Records sort and filter by the day the event happened, falling back to the entry day.
     const day="COALESCE(o.observed_on,(o.created_at AT TIME ZONE 'Asia/Shanghai')::date)",dir=q.order==='asc'?'ASC':'DESC';
-    const rows=(await db.query(`SELECT o.id,o.original_text,o.transcript,o.media_id,o.share_with_agent,o.status,o.attempts,o.error_code,o.replaces_id,o.created_at,o.updated_at,to_char(${day},'YYYY-MM-DD') AS observed_on,
+    const rows=(await db.query(`SELECT o.id,o.original_text,o.transcript,o.media_id,o.share_with_agent,o.status,o.attempts,o.error_code,o.replaces_id,o.created_at,o.updated_at,to_char(o.observed_on,'YYYY-MM-DD') AS observed_on,
       (SELECT COALESCE(json_agg(json_build_object('slot',split_part(m.object_name,'/',4),'mime',m.mime) ORDER BY m.object_name),'[]'::json) FROM media m WHERE m.observation_id=o.id) AS visuals
       FROM observations o WHERE o.pet_id=$1 AND ($2='' OR position(lower($2) in lower(o.original_text||' '||COALESCE(o.transcript,'')))>0) AND ($3='all' OR o.status=$3 OR ($3='processing' AND o.status='queued')) AND ($4::date IS NULL OR ${day}>=$4::date) AND ($5::date IS NULL OR ${day}<=$5::date) AND ($6='' OR o.id=$6) ORDER BY ${day} ${dir},o.created_at ${dir},o.id LIMIT 100`,[req.params.id,q.q,q.status,q.from||null,q.to||null,q.id])).rows;
     return {observations:rows.map(r=>({...r,visuals:(typeof r.visuals==='string'?JSON.parse(r.visuals):r.visuals).map(v=>({url:`${apiOrigin}/v1/pets/${req.params.id}/visual/${v.slot}`,mime:v.mime}))}))};

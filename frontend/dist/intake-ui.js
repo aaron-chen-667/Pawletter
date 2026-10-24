@@ -5,27 +5,13 @@ import {createOnboardingSpeech} from './onboarding-speech.js';
 import {createIntakeDraftStore} from './intake-draft-store.js';
 import {createIntakeCamera} from './intake-camera.js';
 import {knowledgeTopics,topicOf} from './pet-knowledge.js';
+import {composerIcons as icons,inputModeStore as localModeStore,renderComposer} from './intake-composer.js';
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const svg=body=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
-const icons={
- mic:svg('<rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>'),
- plus:svg('<path d="M12 5v14M5 12h14"/>'),
- close:svg('<path d="M6 6l12 12M18 6 6 18"/>'),
- album:svg('<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.5"/><path d="m3 16 5-5 4 4 4-6 5 7"/>'),
- camera:svg('<path d="m8 5 2-2h4l2 2h4a2 2 0 0 1 2 2v12H2V7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="12" r="4"/>'),
- file:svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>'),
- unsure:svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01"/>'),
- stop:svg('<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>'),
- keyboard:svg('<rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>'),
- redo:svg('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>'),
-};
 const join=(a,b)=>[a,b].filter(Boolean).join('\n');
 // Example mode only: a canned answer for whichever dimension the conversation is asking about.
 const exampleAnswers={first:'今天刚接回一只橘猫，还没有名字。年龄大概一岁，送来的人估计的。人靠近时会躲，刚吃了点罐头。',sex:'是只公猫。',health:'身上没看到伤，疫苗和驱虫都还没做，也没绝育。',character:'送来的人说它平时挺黏人，就是怕生，熟了会蹭人。',likes:'喜欢追逗猫棒，摸下巴会呼噜。',habits:'会用猫砂，白天睡得多，晚上比较闹。',diet:'吃猫粮和罐头，喝水正常。'};
-const maxText=4000,greeting='先发张照片，或者说说它的情况吧。',modeKey='pawletter.intake.input-mode';
-// The rescuer's last choice between the big talk button and typing; storage failures fall back to voice.
-const localModeStore={get(){try{return localStorage.getItem(modeKey);}catch{return null;}},set(value){try{localStorage.setItem(modeKey,value);}catch{}}};
+const maxText=4000,greeting='先发张照片，或者说说它的情况吧。';
 const speciesLabels={cat:'猫',dog:'狗',unknown:'不确定'},sexLabels={male:'公',female:'母',unknown:'不确定'};
 const fieldLimits={name:80,age:80,character:500,description:4000};
 // Same dimensions and asking order as the server organiser: profile fields first, then knowledge topics.
@@ -127,12 +113,12 @@ ${composerView()}
   const panel=s.panel&&!s.commit?`<div class="intake-panel">${button(`<span>${icons.album}</span>相册`,'album','intake-panel-item')}${button(`<span>${icons.camera}</span>拍摄`,'camera','intake-panel-item')}${button(`<span>${icons.file}</span>文件`,'document','intake-panel-item')}${button(`<span>${icons.unsure}</span>不清楚`,'decline','intake-panel-item',s.review?.nextDimension?'':'hidden')}${exampleMode?button(`<span>${icons.album}</span>示例照片`,'sample','intake-panel-item'):''}</div>`:'';
   const plus=button(s.panel?icons.close:icons.plus,'attachments','intake-icon-button',`aria-label="${s.panel?'收起':'更多入口'}" aria-expanded="${!!s.panel}"`);
   const answer=(extra='')=>`<textarea id="intake-answer" rows="1" maxlength="${maxText}" aria-label="说说它的情况" placeholder="${s.review?'还想补充或更正…':'说说它的情况…'}" ${working||s.commit||extra?'readonly':''}>${esc(s.input)}</textarea>`;
-  if(mode==='text')return `<div class="intake-composer" data-mode="text">${audio}<div class="intake-bar">${button(icons.mic,'mode','intake-icon-button','aria-label="切换到语音"')}<div class="intake-input">${answer()}</div>${s.input.trim()?button('发送','send','intake-send'):plus}</div>${panel}</div>`;
+  if(mode==='text')return renderComposer({mode,audio,answer:answer(),left:button(icons.mic,'mode','intake-icon-button','aria-label="切换到语音"'),right:s.input.trim()?button('发送','send','intake-send'):plus,panel});
   const state=dockState(),talkLabel=talk.state.holding?'结束说话':exampleMode?'试一段示例口述':state==='review'?'接着说':'点击说话';
   const talkButton=`<button type="button" id="intake-record" class="intake-talk-button${talk.state.holding?' recording':''}${state==='review'?' small':''}" aria-label="${talkLabel}" aria-pressed="${talk.state.holding}" ${s.busy||talk.state.finishing||s.commit||s.audio?'disabled':''}>${talk.state.holding?icons.stop:icons.mic}</button>`;
-  if(state==='rec')return `<div class="intake-composer voice" data-state="rec"><div class="intake-caption"><small id="intake-live" role="status"></small>${answer('live')}</div><div class="intake-voice-row">${talk.state.holding?'<button type="button" class="intake-pill" data-voice="cancel">取消</button>':'<span class="intake-pill-space"></span>'}${talkButton}<span class="intake-pill-space"></span></div><p class="intake-voice-hint">${talk.state.finishing?'正在转写…':'再点一下结束'}</p></div>`;
-  if(state==='review')return `<div class="intake-composer voice" data-state="review">${audio}<div class="intake-caption editable"><small>可以直接改</small>${answer()}</div><div class="intake-voice-row">${button(`${icons.redo}<span>重说</span>`,'redo','intake-pill')}${talkButton}${button('发送','send','intake-send')}</div><p class="intake-voice-hint">点麦克风可以接着说</p></div>`;
-  return `<div class="intake-composer voice" data-state="idle">${audio}<div class="intake-voice-row">${button(icons.keyboard,'mode','intake-icon-button','aria-label="切换到打字"')}${talkButton}${plus}</div><p class="intake-voice-hint">${exampleMode?'点一下试一段示例口述':'点一下开始说'}</p>${panel}</div>`;
+  if(state==='rec')return renderComposer({mode,state,caption:'<small id="intake-live" role="status"></small>',answer:answer('live'),left:talk.state.holding?'<button type="button" class="intake-pill" data-voice="cancel">取消</button>':'<span class="intake-pill-space"></span>',center:talkButton,right:'<span class="intake-pill-space"></span>',hint:talk.state.finishing?'正在转写…':'再点一下结束'});
+  if(state==='review')return renderComposer({mode,state,audio,caption:'<small>可以直接改</small>',answer:answer(),left:button(`${icons.redo}<span>重说</span>`,'redo','intake-pill'),center:talkButton,right:button('发送','send','intake-send'),hint:'点麦克风可以接着说'});
+  return renderComposer({mode,state,audio,left:button(icons.keyboard,'mode','intake-icon-button','aria-label="切换到打字"'),center:talkButton,right:plus,hint:exampleMode?'点一下试一段示例口述':'点一下开始说',panel});
  }
  function updateControls(){
   const input=root.querySelector('#intake-answer');if(input)input.readOnly=locked()||!!s.commit;

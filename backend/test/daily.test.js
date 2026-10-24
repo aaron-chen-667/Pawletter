@@ -41,7 +41,7 @@ test('a daily record keeps when it happened, its photos and video, and leaves th
 
 test('records sort and filter by the day they happened, and entries without a date fall back to the entry day',async()=>{
  await submit({text:'上周的事。',observedOn:daysAgo(7)});await submit({text:'今天的事，没填日期。'});
- const rows=await list();assert.equal(rows[0].observed_on,today());assert.equal(rows.at(-1).observed_on,daysAgo(7));
+ const rows=await list();assert.equal(rows[0].observed_on,null);assert.equal(rows.at(-1).observed_on,daysAgo(7));
  const week=await list(`?from=${daysAgo(8)}&to=${daysAgo(6)}`);assert.deepEqual(week.map(r=>r.original_text),['上周的事。']);
 });
 
@@ -59,4 +59,14 @@ test('a correction replaces the old record and keeps its photos',async()=>{
  const rows=await list();
  assert.equal(rows.find(r=>r.id===first).status,'withdrawn');assert.deepEqual(rows.find(r=>r.id===first).visuals,[]);
  const corrected=rows.find(r=>r.id===fixed.json().id);assert.equal(corrected.replaces_id,first);assert.equal(corrected.visuals.length,1);assert.equal(corrected.observed_on,daysAgo(3));
+});
+
+
+test('media-only supplements archive without inventing knowledge or requiring an event date',async()=>{
+ const saved=await submit({photos:[jpeg],video});assert.equal(saved.statusCode,202,saved.body);
+ const id=saved.json().id,result=await request(station,'POST',`/v1/observations/${id}/process`);
+ assert.equal(result.statusCode,200,result.body);assert.equal(result.json().error,undefined,'Media alone does not need ASR or text extraction');
+ const record=(await list()).find(r=>r.id===id);assert.equal(record.status,'archived');assert.equal(record.original_text,'');assert.equal(record.observed_on,null);assert.equal(record.visuals.length,2);
+ assert.equal((await db.query('SELECT * FROM knowledge WHERE observation_id=$1',[id])).rows.length,0);
+ assert.equal((await submit({text:'',photos:[]})).statusCode,400,'A completely empty addition is still rejected');
 });

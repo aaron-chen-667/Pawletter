@@ -23,3 +23,10 @@ test('empty input is rejected before networking and private notes remain opt-in'
  await sender.send({petId:'p',text:'  今天不愿被抱。  '});assert.equal(calls[0][1].shareWithAgent,false);assert.equal(calls[0][1].text,'今天不愿被抱。');
  assert.match(errorMessage({message:'SESSION_EXPIRED'}),/重新登录/);
 });
+
+
+test('media-only input is submitted without fabricated text, and definite rejection allows editing',async()=>{
+ const calls=[];let reject=true;const sender=createObservationSender({submitObservation:async(...args)=>{calls.push(args);if(reject)throw Object.assign(new Error('INVALID_INPUT'),{status:400});return{id:'one'};}});
+ await assert.rejects(sender.send({petId:'p',photos:['photo']}),/INVALID_INPUT/);assert.equal(sender.pending,false);
+ reject=false;await sender.send({petId:'p',video:'video'});assert.deepEqual(calls[1][1],{text:'',shareWithAgent:false,video:'video'});assert.notEqual(calls[0][2],calls[1][2]);
+});

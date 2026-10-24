@@ -206,37 +206,44 @@
 .intake-saved-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}
 .intake-saved-actions p{margin:0!important}
 @media(max-height:720px){.intake-simple-page .topbar{min-height:68px;padding-block:10px}.intake-simple-page .main{padding-top:6px}.intake-simple-page .station-example-bar{margin-bottom:8px}.intake-add-empty{min-height:78px}.intake-materials{margin-bottom:12px}.online-app .intake-writing textarea{min-height:152px;height:152px;padding:16px 18px 6px}.intake-record-area{padding-top:18px;gap:10px}.intake-record-button{width:78px;height:78px;border-radius:27px}.intake-record-button svg{width:31px;height:31px}#intake-confirm.intake-save-dock{padding-block:10px max(12px,env(safe-area-inset-bottom))}}
-.daily-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.daily-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-shrink:0}
 .daily-spacer{flex:1}
 .daily-who{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 10px 0 4px;border-radius:999px;background:white;border:1px solid var(--line);font-size:15px;color:var(--ink)}
 .daily-who:disabled{opacity:1}
 .daily-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0}
 .daily-avatar.initial,.daily-pick-avatar.initial{display:grid;place-items:center;background:#eef0f6;color:#3d4a5c;font-weight:600}
-.daily-date-chip{display:inline-flex;align-items:center;gap:2px;min-height:36px;padding:0 10px 0 14px;border-radius:999px;border:1px solid #cbd2e0;background:white;font-size:13px;color:var(--ink)}
-.daily-date-chip svg{width:16px;height:16px}
-.daily-date-chip.open{background:#202430;border-color:#202430;color:white}
-.daily-body{gap:12px}
-.daily-entry{background:white;border:1px solid var(--line);border-radius:20px;padding:14px 16px}
-.daily-entry header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
-.daily-entry.correcting{border:1.5px solid #202430}
-.online-app .daily-entry textarea{display:block;width:100%;min-height:72px;field-sizing:content;border:0;padding:0;resize:none;font-size:16px;line-height:1.7;background:transparent;color:var(--ink)}
-.online-app .daily-entry textarea:focus{outline:0}
-.daily-original{margin:0 0 10px;font-size:14px;color:#9aa3b5}
-.daily-original small,.daily-change-label{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
-.daily-thumbs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-.daily-thumb{position:relative;width:76px;height:76px;border-radius:12px;overflow:hidden;background:#eef0f6}
-.daily-thumb img{width:100%;height:100%;object-fit:cover}
-.daily-thumb-remove{position:absolute;top:2px;right:2px;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#1c2431cc;color:white}
-.daily-thumb-remove svg{width:14px;height:14px}
+.daily-finish{min-height:44px;padding:0 14px;border-radius:22px;background:#202430;color:white;font-size:14px;font-weight:600}
+.daily-finish:disabled{background:#e9edf3;color:#7b8497}
+.daily-body{gap:12px;scrollbar-width:thin}
+.daily-entry{max-width:82%;min-width:150px;align-self:flex-end;flex-shrink:0}
+.daily-entry .intake-bubble{max-width:100%;white-space:normal}
+.daily-entry.editing .intake-bubble{outline:1px solid var(--ink);outline-offset:2px}
+.daily-entry p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:inherit;line-height:inherit}
+.daily-entry footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;font-size:12px;color:var(--muted)}
+.daily-entry footer>div{display:flex;gap:10px;margin-left:auto}
+.daily-entry footer .text-button{min-height:36px;padding:0 2px;color:var(--muted)}
+.daily-original{margin:0 0 10px;font-size:14px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.daily-original small{display:block;font-size:12px;margin-bottom:4px}
+.daily-thumbs{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+.daily-thumb{position:relative;width:96px;height:96px;border-radius:12px;overflow:hidden;background:white}
+.daily-thumb:has(video){width:152px;height:108px}
+.daily-thumb img,.daily-thumb video{width:100%;height:100%;object-fit:contain}
+.daily-thumb-remove{position:absolute;top:2px;right:2px;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#1c2431cc;color:white;z-index:1}
+.daily-thumb-remove svg{width:16px;height:16px}
+.daily-dock{max-height:58dvh;overflow:auto}
+.daily-options{display:flex;align-items:center;gap:8px;margin-top:10px;min-height:44px}
+.daily-options .intake-tag{min-height:36px;margin:0}
+.daily-options .intake-icon-button{width:36px;height:36px}
+.daily-editing-label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.daily-review-actions{flex-shrink:0;padding:12px 0 max(16px,env(safe-area-inset-bottom))}
 .daily-save{min-height:50px;border-radius:16px}
-.daily-sheet{flex-shrink:0;margin:0 -3px;padding:14px 16px 6px;background:white;border-top:1px solid var(--line);border-radius:20px 20px 0 0}
+.daily-sheet{padding:8px 0;background:var(--bg);border-top:1px solid var(--line);margin-top:8px}
 .daily-sheet h2{margin:0 0 6px;font-size:15px}
-.daily-sheet-option{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:46px;padding:0 2px;border:0;border-top:1px solid #eef0f4;background:transparent;font-size:15px;color:var(--ink);text-align:left}
+.daily-sheet-option{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;padding:0 2px;border:0;border-top:1px solid #eef0f4;background:transparent;font-size:14px;color:var(--ink);text-align:left}
 .daily-sheet-option[aria-pressed=true]{font-weight:600}
 .daily-sheet-option svg{width:18px;height:18px}
 .online-app .daily-sheet-option input{width:auto;min-height:36px;border:1px solid var(--line);border-radius:10px;padding:0 8px;font-size:14px}
-.daily-sheet p{margin:6px 0 0;font-size:12px;color:var(--muted)}
-.daily-caption-text,#daily-caption{margin:0;font-size:18px;line-height:1.55;min-height:28px;color:var(--ink)}
+.daily-picker{overflow:auto}
 .daily-picker h2{margin:6px 0 10px;font-size:13px;font-weight:600;color:var(--muted)}
 .daily-pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:12px;margin-bottom:16px}
 .daily-pick{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:96px;padding:6px 0;background:transparent;font-size:13px;color:var(--ink)}

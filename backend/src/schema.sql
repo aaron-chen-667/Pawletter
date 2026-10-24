@@ -96,3 +96,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS followup_active ON rescue_followups(applicatio
 -- Daily records: when the event happened (entry time stays created_at) and the photos or video saved with it.
 ALTER TABLE observations ADD COLUMN IF NOT EXISTS observed_on date;
 ALTER TABLE media ADD COLUMN IF NOT EXISTS observation_id text REFERENCES observations(id);
+
+-- Visual-only supplements are valid content; the API stores their files in the same transaction.
+ALTER TABLE observations ADD COLUMN IF NOT EXISTS has_visuals boolean NOT NULL DEFAULT false;
+ALTER TABLE observations DROP CONSTRAINT IF EXISTS observations_check;
+ALTER TABLE observations ADD CONSTRAINT observations_check CHECK (length(original_text)>0 OR media_id IS NOT NULL OR has_visuals);

@@ -34,6 +34,7 @@ test('intake completion blocks logout until its delayed list response opens the 
    if(authorization==='Bearer a'&&committed)return new Promise(resolve=>{resolveList=resolve;});
    return Response.json({pets:authorization==='Bearer b'?[petB]:[]});
   }
+  if(path==='/v1/stations')return Response.json({stations:[{id:authorization==='Bearer b'?'station-b':'station-a',name:'测试救助站'}]});
   if(path==='/v1/applications')return Response.json({applications:[]});
   if(path==='/v1/followups')return Response.json({followups:[]});
   if(path==='/v1/intake/analyze')return Response.json({name:petA.name,species:'unknown',description:petA.profile.description,character:'',age:'',sex:'unknown',ocrText:'',nextQuestion:'',uncertainties:[],corrections:[]});

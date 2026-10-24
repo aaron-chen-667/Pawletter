@@ -13,6 +13,7 @@ import {petProfileSchema,voiceSchema,defaultVoice,readAgent} from './pet-agent.j
 import {applicationRoutes} from './applications.js';
 import {followupRoutes} from './followups.js';
 import {intakeRoutes,storeVisuals,jpegImage} from './intake.js';
+import {createOriginCheck} from './origins.js';
 
 const text = max => z.string().trim().min(1).max(max);
 // observedOn is when it happened (Beijing calendar day, never in the future); created_at stays the entry time.
@@ -20,12 +21,13 @@ const beijingToday = () => new Date().toLocaleDateString('sv-SE',{timeZone:'Asia
 const observationBody = z.object({text:z.string().trim().max(12000).default(''),mediaId:z.string().uuid().optional(),shareWithAgent:z.boolean().default(false),replacesId:z.string().uuid().optional(),observedOn:z.iso.date().refine(d=>d>='2000-01-01'&&d<=beijingToday(),'OBSERVED_ON_INVALID').optional(),photos:z.array(jpegImage).max(3).default([]),video:z.string().max(14500000).optional()}).strict().refine(v=>!!v.text || !!v.mediaId || v.photos.length>0 || !!v.video,'Content is required');
 const publicPet = row => ({id:row.id,name:row.name,stationId:row.station_id,published:row.published,profile:row.profile});
 const topicWords={health:'健康|肠胃|软便|呕吐|生病|疫苗|绝育|过敏|食欲',diet:'饮食|吃|喝|粮|喂|罐头',habits:'作息|习惯|睡|独处|厕所|猫砂|散步',likes:'喜欢|玩|抱|摸|怕|躲|亲近|互动'};
-export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin = 'https://pawletter-adoption-h5.chenaaron668.chatgpt.site', logger = false }) {
+export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin, additionalOrigins, logger = false }) {
+  const isAllowedOrigin = createOriginCheck(origin, additionalOrigins);
   const app = Fastify({logger,disableRequestLogging:true,bodyLimit:20*1024*1024,requestTimeout:180000,trustProxy:false});
   const deps = {db,ai,storage};
   // The public asset URL is server-owned, never accepted from an intake client.
   const apiOrigin=process.env.WORKER_AUDIENCE||'https://pawletter-api-446222711695.asia-east1.run.app';
-  await app.register(cors,{origin,methods:['GET','POST','DELETE','OPTIONS'],allowedHeaders:['Content-Type','Authorization','Idempotency-Key'],credentials:false});
+  await app.register(cors,{origin:(requestOrigin,done)=>done(null,isAllowedOrigin(requestOrigin)),methods:['GET','POST','DELETE','OPTIONS'],allowedHeaders:['Content-Type','Authorization','Idempotency-Key'],credentials:false});
   await app.register(rateLimit,{max:60,timeWindow:'1 minute'});
   app.addContentTypeParser(audioTypes,{parseAs:'buffer'},(req,body,done)=>done(null,body));
   app.setErrorHandler((err,request,reply)=>{
@@ -51,7 +53,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   const audit = (client,user,action,id) => client.query('INSERT INTO audit_events(id,actor_id,action,target_id) VALUES($1,$2,$3,$4)',[randomUUID(),user.id,action,id]);
   app.post('/v1/onboarding/transcribe',{bodyLimit:6*1024*1024,config:{rateLimit:{max:8,timeWindow:'1 minute'}}},async(req,reply)=>{
     // Origin is a browser boundary, not authentication. Shared quotas bound anonymous spend.
-    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    assert(isAllowedOrigin(req.headers.origin),403,'ORIGIN_REQUIRED');
     const mime=req.headers['content-type']?.split(';')[0];
     assert(validAudio(req.body,mime),400,'INVALID_AUDIO_FILE');
     await transaction(db,async client=>{
@@ -69,7 +71,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     try{return {text:await ai.transcribe(req.body,mime)};}catch(error){if(error.code==='AI_RATE_LIMITED'){reply.header('Retry-After','30');throw new ApiError(429,'SPEECH_PROVIDER_BUSY');}throw error;}
   });
   app.post('/v1/onboarding/interview',{config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async req=>{
-    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    assert(isAllowedOrigin(req.headers.origin),403,'ORIGIN_REQUIRED');
     const body=z.object({key:z.enum(Object.keys(answerOptions)),text:text(2000)}).strict().parse(req.body);
     await reserveBudget(db,'interview',10,200);
     const result=await ai.interview(body.key,body.text,answerOptions[body.key]);
@@ -77,12 +79,12 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     assert(parsed.success,502,'AI_INVALID_RESPONSE');return parsed.data;
   });
   app.post('/v1/onboarding/summary',{config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async req=>{
-    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    assert(isAllowedOrigin(req.headers.origin),403,'ORIGIN_REQUIRED');
     const answers=answersSchema.parse(req.body);await reserveBudget(db,'summary',5,100);
     const result=analysisSchema.safeParse(await ai.summarizeLifestyle(answers));assert(result.success,502,'AI_INVALID_RESPONSE');return result.data;
   });
   app.post('/v1/auth/register',{config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{
-    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    assert(isAllowedOrigin(req.headers.origin),403,'ORIGIN_REQUIRED');
     const result=await registerAdopter(db,req.body,req.headers['idempotency-key']);return reply.code(201).send(result);
   });
   app.get('/v1/adopter/profile',{preHandler:auth},async req=>{assert(req.user.role==='adopter',403,'ADOPTER_REQUIRED');return adopterProfile(db,req.user.id);});

@@ -26,11 +26,11 @@ test('online UI logs in with server role, records to correct pet, preserves corr
   fill('[name=username]','staff');fill('[name=password]','not-a-real-password');submit('#login-form');
   await waitFor(()=>q('[data-live=voice]')&&!q('[data-live=voice]').disabled);
   assert.match(q('#app').textContent,/救助站工作台/);
-  click('[data-live=voice]');await waitFor(()=>q('#observation-text'));
-  fill('#observation-text','今天不愿被抱。');q('#share-agent').checked=false;q('#share-agent').dispatchEvent(new window.Event('change',{bubbles:true}));
-  click('[data-live=submit-text]');await waitFor(()=>q('[data-live=correct]')&&!q('[data-live=correct]').disabled);
+  click('[data-live=voice]');await waitFor(()=>q('[data-daily=pick]'));click('[data-daily=pick]');await waitFor(()=>q('#daily-text'));
+  fill('#daily-text','今天不愿被抱。');click('[data-daily=local]');
+  click('[data-daily=save]');await waitFor(()=>q('[data-live=correct]')&&!q('[data-live=correct]').disabled);
   const observation=calls.find(c=>c.path.endsWith('/observations')&&c.body);assert.equal(observation.body.text,'今天不愿被抱。');assert.equal(observation.body.shareWithAgent,false);assert.ok(observation.headers['Idempotency-Key']);
-  click('[data-live=correct]');await waitFor(()=>q('#observation-text')?.value==='今天不愿被抱。');assert.equal(q('#share-agent').checked,false);
+  click('[data-live=correct]');await waitFor(()=>q('#daily-text')?.value==='今天不愿被抱。');assert.match(q('.daily-original').textContent,/今天不愿被抱/);
   click('[data-live=home]');await waitFor(()=>q('[data-live=pets]'));assert.equal(q('[data-live=pet]'),null);click('[data-live=pets]');await waitFor(()=>q('[data-live=pet]'));click('[data-live=pet]');await waitFor(()=>q('[data-live=chat]'));
   click('[data-live=chat]');fill('#chat-question','它喜欢被抱吗？');failChat=true;submit('#chat-form');
   await waitFor(()=>q('#live-error').textContent.includes('暂时'));assert.equal(q('#chat-question').value,'它喜欢被抱吗？');assert.equal(document.querySelectorAll('.chat-bubble').length,0);

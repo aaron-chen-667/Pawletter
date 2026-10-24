@@ -4,6 +4,8 @@ export const STATION_EXAMPLES_KEY='pawletter.station.examples.v13';
 export const stationScenes=[['home','工作台','今日申请与宠物日常'],['empty','首次进入','录入第一位伙伴'],['new','录入新伙伴','添加素材，记录情况，确认入档'],['voice','补充日常','按住说，核对转录后归档'],['pet','长期档案','照片、习惯与健康观察'],['agent','分身表达','只调整口吻，不编写事实'],['chat','分身问答','根据有效资料回答'],['applications','领养申请','待审核、见面、交接'],['application','申请详情','生活画像与核验状态'],['failed','整理失败','保留原文，重新整理'],['followups','回访跟踪','安排回访、确认与持续跟进'],['private','私有观察','本站可见，不用于对外回答']];
 export const exampleObservation='吐司平时喜欢玩羽毛逗猫棒。今天换粮后有点软便，还不确定原因。';
 const stamp=()=>new Date().toISOString();
+const dayOf=iso=>{const d=new Date(iso),pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
+const day=r=>r.observed_on||dayOf(r.created_at);
 export function stationFixture(){
  const source=createAdopterExamples(),stationId='example-station';
  const pets=source.pets.slice(0,9).map(p=>({id:p.id,name:p.name,stationId,profile:{species:p.species==='dog'?'dog':'cat',description:p.intro,character:p.character,age:p.age,sex:'unknown',photoUrl:p.image},published:p.id!==source.pets[8].id}));
@@ -21,17 +23,26 @@ export function createStationExamples(storage=globalThis.sessionStorage){
   login:async()=>({user:copy(state.user)}),logout:async()=>{},me:async()=>copy(state.user),pets:async()=>({pets:copy(state.pets)}),applications:async()=>({applications:copy(state.applications)}),
   applicationStage:async(id,stage,version)=>{const a=state.applications.find(a=>a.id===id);if(!a||a.version!==version)throw Error('INVALID_INPUT');if(stage===3&&a.snapshot.verification!=='verified')throw Error('INVALID_INPUT');Object.assign(a,{stage,version:version+1});save();return copy(a);},
   setVisibility:async(id,published)=>{const p=state.pets.find(p=>p.id===id);if(!p||p.stationId!==state.user.stationId)throw Error('STATION_REQUIRED');p.published=published;save();return {ok:true};},
-  knowledge:async id=>({notes:state.records.filter(r=>r.pet_id===id&&r.status==='archived'&&r.share_with_agent).flatMap(notes)}),
-  observations:async(id,f={})=>({observations:copy(state.records.filter(r=>r.pet_id===id&&(!f.id||r.id===f.id)&&(!f.q||(r.original_text+' '+r.transcript).includes(f.q))&&(!f.status||f.status==='all'||(f.status==='processing'?['queued','processing'].includes(r.status):r.status===f.status))&&(!f.from||r.created_at>=new Date(f.from+'T00:00:00+08:00').toISOString())&&(!f.to||r.created_at<new Date(Date.parse(f.to+'T00:00:00+08:00')+86400000).toISOString())).sort((a,b)=>(f.order==='asc'?1:-1)*a.created_at.localeCompare(b.created_at)))}),
+  // The station sees every archived note; the pet's agent only uses shared ones.
+  knowledge:async id=>({notes:state.records.filter(r=>r.pet_id===id&&r.status==='archived').flatMap(notes)}),
+  observations:async(id,f={})=>({observations:copy(state.records.filter(r=>r.pet_id===id&&(!f.id||r.id===f.id)&&(!f.q||(r.original_text+' '+r.transcript).includes(f.q))&&(!f.status||f.status==='all'||(f.status==='processing'?['queued','processing'].includes(r.status):r.status===f.status))&&(!f.from||day(r)>=f.from)&&(!f.to||day(r)<=f.to)).sort((a,b)=>(f.order==='asc'?1:-1)*(day(a).localeCompare(day(b))||a.created_at.localeCompare(b.created_at))).map(r=>({visuals:[],...r,observed_on:day(r)})))}),
   followups:async()=>({followups:copy(state.followups)}),
   createFollowup:async(body,key)=>{const old=state.followups.find(f=>f.key===key);if(old)return copy(old);const a=state.applications.find(a=>a.id===body.applicationId);if(!a||a.stage!==3)throw Error('INVALID_INPUT');const f={id:crypto.randomUUID(),key,...body,name:a.name,petId:a.petId,adopterId:a.adopterId,status:'pending',version:1,updatedAt:stamp(),history:[{at:stamp(),status:'pending',text:body.note}]};state.followups.push(f);save();return copy(f);},
   updateFollowup:async(id,body)=>{const f=state.followups.find(f=>f.id===id);if(f.history.some(h=>h.requestId===body.requestId))return copy(f);if(f.version!==body.version)throw Error('INVALID_INPUT');Object.assign(f,{status:body.status,dueAt:body.dueAt,version:f.version+1,updatedAt:stamp()});f.history.push({at:stamp(),status:body.status,text:body.note,requestId:body.requestId});save();return copy(f);},
   intake:async id=>({documents:copy(state.documents?.[id]||[]),source_text:state.sources?.[id]||'',visuals:copy(state.media[id]||[{url:state.pets.find(p=>p.id===id)?.profile.photoUrl,mime:'image/jpeg',caption:'救助站上传的示例照片',shared:true,createdAt:stamp()}].filter(v=>v.url))}),
   addVisuals:async(id,body,key)=>{state.media[id]||=(await api.intake(id)).visuals;if(state.media[id].some(v=>v.key===key))return {ok:true};state.media[id].push(...body.photos.map(url=>({url,mime:'image/jpeg',caption:body.caption,shared:body.shared,createdAt:stamp(),key})),...(body.video?[{url:body.video,mime:body.video.startsWith('data:video/mp4')?'video/mp4':'video/webm',caption:body.caption,shared:body.shared,createdAt:stamp(),key}]:[]));save();return {ok:true};},
-  submitObservation:async(petId,body,key)=>{const prior=state.records.find(r=>r.key===key);if(prior)return {id:prior.id};if(body.replacesId)row(body.replacesId).status='withdrawn';const r={id:crypto.randomUUID(),pet_id:petId,original_text:body.text,share_with_agent:body.shareWithAgent,status:'queued',created_at:stamp(),key};state.records.unshift(r);save();return {id:r.id};},
+  // Like the server: a record keeps the day it happened and the photos or video saved with it; a correction keeps the old media.
+  submitObservation:async(petId,body,key)=>{
+   const prior=state.records.find(r=>r.key===key);if(prior)return {id:prior.id};
+   const visuals=[...(body.photos||[]).map(url=>({url,mime:'image/jpeg'})),...(body.video?[{url:body.video,mime:body.video.startsWith('data:video/mp4')?'video/mp4':'video/webm'}]:[])];
+   if(body.replacesId){const old=row(body.replacesId);old.status='withdrawn';visuals.unshift(...(old.visuals||[]));old.visuals=[];}
+   const r={id:crypto.randomUUID(),pet_id:petId,original_text:body.text,share_with_agent:body.shareWithAgent,status:'queued',created_at:stamp(),observed_on:body.observedOn||dayOf(stamp()),replaces_id:body.replacesId||null,visuals,key};
+   if(visuals.length){state.media[petId]||=(await api.intake(petId)).visuals;state.media[petId].push(...visuals.filter(v=>!state.media[petId].some(m=>m.url===v.url)).map(v=>({...v,shared:false,createdAt:stamp()})));}
+   state.records.unshift(r);save();return {id:r.id};
+  },
   processObservation:async id=>{row(id).status='archived';save();return {ok:true};},retryObservation:async id=>{row(id).status='queued';save();return {ok:true};},withdrawObservation:async id=>{row(id).status='withdrawn';save();return {ok:true};},
   agent:async id=>({voice:copy(state.voices[id]||{tone:'shy',style:'轻声短句，慢慢熟悉。'})}),updateAgent:async(id,voice)=>{state.voices[id]=copy(voice);save();return {voice};},
-  chat:async(id,question)=>{const notes=(await api.knowledge(id)).notes;const terms=/健康|吃|粮|便|食欲/.test(question)?/健康|吃|粮|便|食欲/:/喜欢|玩|靠近|互动/;const found=notes.filter(n=>terms.test(n.quote)).slice(0,2);return {answer:found.length?'照顾我的人记下了：'+found.map(n=>n.quote).join(' ')+'（预设示例回答）':'这件事还没有记进我的有效档案，我暂时不知道。（预设示例回答）',citations:found};},
+  chat:async(id,question)=>{const shared=state.records.filter(r=>r.pet_id===id&&r.status==='archived'&&r.share_with_agent).flatMap(notes);const terms=/健康|吃|粮|便|食欲/.test(question)?/健康|吃|粮|便|食欲/:/喜欢|玩|靠近|互动/;const found=shared.filter(n=>terms.test(n.quote)).slice(0,2);return {answer:found.length?'照顾我的人记下了：'+found.map(n=>n.quote).join(' ')+'（预设示例回答）':'这件事还没有记进我的有效档案，我暂时不知道。（预设示例回答）',citations:found};},
   // This deterministic preview is explicitly labelled as an example, never a real AI response.
   draftIntake:async body=>{
    const lines=body.text.split('\n').map(t=>t.replace(/^救助者口述：/,''));
@@ -56,7 +67,9 @@ export function createStationExamples(storage=globalThis.sessionStorage){
    next.documents[p.id]=(body.documents||[]).map(d=>({name:d.name,url:d.dataUrl,mime:d.dataUrl.split(';')[0].slice(5)}));
    if(body.video)next.media[p.id].push({url:body.video,mime:body.video.startsWith('data:video/mp4')?'video/mp4':'video/webm',shared:false,createdAt:stamp()});
    let observationId=null;
-   if(description?.trim()){observationId=crypto.randomUUID();next.records.unshift({id:observationId,pet_id:p.id,original_text:description,share_with_agent:true,status:'archived',created_at:stamp(),key});}
+   // Reviewed card notes keep their topic, certainty and visibility, like the real server.
+   if(body.notes)for(const n of body.notes){const id=crypto.randomUUID();observationId||=id;next.records.unshift({id,pet_id:p.id,original_text:n.quote,share_with_agent:n.shared,topic:n.topic,certainty:n.certainty,status:'archived',created_at:stamp(),key});}
+   else if(description?.trim()){observationId=crypto.randomUUID();next.records.unshift({id:observationId,pet_id:p.id,original_text:description,share_with_agent:true,status:'archived',created_at:stamp(),key});}
    try{if(!storage)throw Error('STORAGE_UNAVAILABLE');storage.setItem(STATION_EXAMPLES_KEY,JSON.stringify(next));}catch{throw Error('EXAMPLE_STORAGE_FULL');}
    state=next;return {id:p.id,observationId};
   },

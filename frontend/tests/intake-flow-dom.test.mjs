@@ -13,10 +13,10 @@ function savedDraft(overrides={}){return {version:3,key:'draft-test-key',created
 function memoryStore(){const values=new Map();return {values,async load(key){return values.has(key)?clone(values.get(key)):null;},async save(key,value){values.set(key,clone(value));},async remove(key){values.delete(key);}};}
 
 async function harness(t,{draftIntake=async()=>draft(),commitIntake=async()=>({id:'new-pet'}),draftStore=memoryStore(),getDraftKey=()=>accountA,transcribe=async()=>({text:'这只橘猫还没有名字，左耳有缺口。'}),mode='text'}={}){
- const modes=[];
+ const modes=[],confirmAnswer={value:true};
  const dom=new JSDOM('<main id="app"></main>',{url:'https://pawletter.invalid/?mode=online&role=station',pretendToBeVisual:true});
  const w=dom.window,root=w.document.querySelector('#app'),previous=new Map(),calls={draft:[],commit:[],done:[],network:[],speech:[]},originalFetch=globalThis.fetch;
- for(const [key,value] of Object.entries({window:w,document:w.document,navigator:w.navigator,location:w.location,FormData:w.FormData,
+ for(const [key,value] of Object.entries({window:w,document:w.document,navigator:w.navigator,location:w.location,FormData:w.FormData,confirm:()=>confirmAnswer.value,
   fetch:async(...args)=>{if(String(args[0]).startsWith('blob:'))return originalFetch(...args);calls.network.push(args);throw new Error('Tests must not call a real service.');},
   FileReader:class {async readAsDataURL(blob){this.result=`data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString('base64')}`;this.onload();}},
  })){
@@ -33,9 +33,9 @@ async function harness(t,{draftIntake=async()=>draft(),commitIntake=async()=>({i
  const say=async value=>{const before=calls.draft.length;type(value);click('[data-intake=send]');await until(()=>calls.draft.length>before&&!ui.busy);};
  const archive=()=>{const form=q('#intake-confirm');assert.ok(form,'Missing #intake-confirm');form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));};
  const bubbles=role=>[...root.querySelectorAll(`.intake-bubble.${role}`)].map(b=>b.textContent.trim());
- const restart=async()=>{await ui.reset();redraw();await until(()=>!ui.busy);};
+ const restart=async()=>{await ui.reset();redraw();await new Promise(resolve=>setTimeout(resolve,0));await until(()=>!ui.busy);};
  t.after(async()=>{await ui.stop();assert.deepEqual(calls.network,[],'No real network requests are allowed');dom.window.close();for(const [key,descriptor]of previous){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}});
- await restart();return {ui,root,w,q,calls,store:draftStore,until,click,type,say,archive,bubbles,redraw,restart,modes};
+ await restart();return {ui,root,w,q,calls,store:draftStore,until,click,type,say,archive,bubbles,redraw,restart,modes,confirmAnswer};
 }
 
 function recording(t,h){
@@ -141,7 +141,7 @@ test('photos in the conversation are sent for analysis and archived privately',a
  const store=memoryStore();store.values.set(accountA,savedDraft({media:[{id:'photo-1',kind:'photo',dataUrl:photo,name:'橘猫.jpg'}],turns:[{id:'t1',role:'me',mediaIds:['photo-1']}]}));
  const h=await harness(t,{draftStore:store});
  assert.ok(h.q('.intake-bubble.media img'));
- await h.say('橘猫。');
+ assert.equal(h.calls.draft.length,1,'A photo left without a reply is organised when the page reopens');
  assert.deepEqual(h.calls.draft[0].images,[{kind:'photo',dataUrl:photo}]);
  h.archive();await h.until(()=>h.calls.done.length===1);
  assert.deepEqual(h.calls.commit[0].payload.photos,[photo]);assert.equal(h.calls.commit[0].payload.published,false);
@@ -238,7 +238,7 @@ test('earlier single-page drafts become one message without losing text or media
  const h=await harness(t,{draftStore:store});
  assert.deepEqual(h.bubbles('me'),['手动核对后的记录：三岁。']);
  await h.say('补充：今天下午刚到。');
- assert.equal(h.calls.draft[0].text,'手动核对后的记录：三岁。\n补充：今天下午刚到。');assert.deepEqual(h.calls.draft[0].images,[{kind:'photo',dataUrl:photo}]);
+ assert.equal(h.calls.draft.at(-1).text,'手动核对后的记录：三岁。\n补充：今天下午刚到。');assert.deepEqual(h.calls.draft.at(-1).images,[{kind:'photo',dataUrl:photo}]);
  h.archive();await h.until(()=>h.calls.done.length===1);assert.equal(h.calls.commit[0].key,'old-key');assert.deepEqual(h.calls.commit[0].payload.photos,[photo]);
 });
 
@@ -264,13 +264,15 @@ test('a late transcript cannot append private speech into another account draft'
  assert.doesNotMatch(JSON.stringify(h.store.values.get('station-b:staff-b')||{}),/旧橘子/);
 });
 
-test('a late reply cannot add to the conversation after the draft was reopened',async t=>{
+test('leaving while the AI replies is allowed, a late reply is dropped and the reply resumes on return',async t=>{
  let finishFirst;const first=new Promise(resolve=>{finishFirst=resolve;});
  const h=await harness(t,{draftIntake:async(_payload,n)=>n===1?first:draft({name:'当前名字'})});
- h.type('原先的记录。');h.click('[data-intake=send]');await h.until(()=>h.calls.draft.length===1);await h.ui.stop();await h.restart();
+ h.type('原先的记录。');h.click('[data-intake=send]');await h.until(()=>h.calls.draft.length===1);
+ assert.equal(h.ui.busy,true);assert.equal(h.ui.blocking,false,'Organising must not trap the rescuer on the page');
+ await h.ui.stop();await h.restart();
+ assert.equal(h.calls.draft.length,2);assert.equal(h.q('[data-review-field=name]').value,'当前名字');
  finishFirst(draft({name:'过期名字'}));await new Promise(resolve=>setTimeout(resolve,10));
- assert.equal(h.bubbles('ai').length,1,'Only the greeting is shown until the rescuer continues');
- await h.say('我重新确认的记录。');assert.equal(h.q('[data-review-field=name]').value,'当前名字');
+ assert.equal(h.bubbles('ai').length,2);assert.equal(h.q('[data-review-field=name]').value,'当前名字');
 });
 
 test('a delayed commit merges only its result into the latest stored draft',async t=>{
@@ -295,4 +297,42 @@ test('example storage failure keeps the conversation and allows another attempt'
  await h.say('需要保留的用户原文。');h.archive();await h.until(()=>h.calls.commit.length===1&&!h.ui.busy);
  assert.equal(h.calls.done.length,0);assert.deepEqual(h.bubbles('me'),['需要保留的用户原文。']);assert.equal(h.store.values.get(accountA).commit,null);
  h.archive();await h.until(()=>h.calls.done.length===1);assert.equal(h.calls.commit[1].payload.text,'需要保留的用户原文。');
+});
+
+test('restart asks first, then clears the conversation and media for a new partner',async t=>{
+ const store=memoryStore();store.values.set(accountA,savedDraft({media:[{id:'photo-1',kind:'photo',dataUrl:photo,name:'橘猫.jpg'}],turns:[{id:'t1',role:'me',mediaIds:['photo-1']}]}));
+ const h=await harness(t,{draftStore:store});await h.say('第一只橘猫。');
+ h.confirmAnswer.value=false;h.click('[data-intake=restart]');await new Promise(resolve=>setTimeout(resolve,10));assert.ok(h.bubbles('me').includes('第一只橘猫。'));
+ h.confirmAnswer.value=true;h.click('[data-intake=restart]');await h.until(()=>!h.q('.intake-bubble.me'));
+ assert.deepEqual(h.bubbles('ai'),['先发张照片，或者说说它的情况吧。']);assert.equal(h.q('[data-intake=restart]'),null);
+ await h.until(()=>h.store.values.get(accountA)?.turns.length===0);const stored=h.store.values.get(accountA);assert.deepEqual(stored.media,[]);assert.notEqual(stored.key,'draft-test-key');
+});
+
+test('each card note carries its long-term or one-off tag and station-only notes stay out of the public profile',async t=>{
+ const h=await harness(t,{draftIntake:async()=>draft({description:'平时喜欢玩逗猫棒。今天吃了少量罐头。送来的人电话已存交接表。'})});
+ await h.say('平时喜欢玩逗猫棒，今天吃了少量罐头，送来的人电话已存交接表。');
+ const tags=()=>[...h.root.querySelectorAll('.intake-item [data-intake=item-certainty]')].map(b=>b.textContent);
+ assert.deepEqual(tags(),['长期','这次','这次']);
+ h.click('.intake-item:nth-of-type(1) [data-intake=item-certainty]');await h.until(()=>tags()[0]==='这次');
+ const items=[...h.root.querySelectorAll('.intake-item')],last=items.at(-1);last.querySelector('[data-intake=item-local]').click();
+ await h.until(()=>h.root.querySelectorAll('.intake-item.local').length===1);
+ h.archive();await h.until(()=>h.calls.done.length===1);
+ const payload=h.calls.commit[0].payload;
+ assert.deepEqual(payload.notes,[{topic:'likes',quote:'平时喜欢玩逗猫棒。',certainty:'observation',shared:true},{topic:'diet',quote:'今天吃了少量罐头。',certainty:'observation',shared:true},{topic:'other',quote:'送来的人电话已存交接表。',certainty:'observation',shared:false}]);
+ assert.equal(payload.profile.description,'平时喜欢玩逗猫棒。今天吃了少量罐头。');
+});
+
+test('a server without guided coverage receives the description only',async t=>{
+ const h=await harness(t,{draftIntake:async()=>{const legacy=draft();delete legacy.coverage;return legacy;}});
+ await h.say('橘猫。');h.archive();await h.until(()=>h.calls.done.length===1);
+ assert.equal(Object.hasOwn(h.calls.commit[0].payload,'notes'),false);assert.equal(h.calls.commit[0].payload.profile.description,'今天吃了少量罐头。橘色短毛猫。','Card order: knowledge topics first, other observations last');
+});
+
+test('public content over the profile limit cannot be archived until shortened',async t=>{
+ const long='它'.repeat(990)+'。';
+ const h=await harness(t,{draftIntake:async()=>draft({description:Array(5).fill(long).join('')})});
+ await h.say('很长的记录。');
+ assert.match(h.q('.intake-card-left.over').textContent,/请删减/);assert.equal(h.q('#intake-confirm button').disabled,true);
+ h.root.querySelector('.intake-item [data-intake=item-local]').click();await h.until(()=>!h.q('.intake-card-left.over'));
+ assert.equal(h.q('#intake-confirm button').disabled,false);
 });

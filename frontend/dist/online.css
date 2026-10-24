@@ -109,7 +109,15 @@
 .intake-topic{border-top:1px solid #eef0f4;padding:10px 0 4px}
 .intake-topic h3{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--muted)}
 .intake-topic-empty{margin:0 0 4px;font-size:13px;color:#9aa3b5}
-.intake-item{display:flex;align-items:flex-start;gap:4px;border-radius:12px;background:#f6f7fb;margin-bottom:6px;padding:2px 2px 2px 10px}
+.intake-item{border-radius:12px;background:#f6f7fb;margin-bottom:6px;padding:2px 2px 8px 10px}
+.intake-item.local{background:#f1f3f7;border:1px dashed #cbd2e0}
+.intake-item-main{display:flex;align-items:flex-start;gap:4px}
+.intake-item-tags{display:flex;gap:6px}
+.intake-tag{min-height:28px;padding:0 10px;border-radius:999px;border:1px solid #cbd2e0;background:white;font-size:12px;color:#3d4a5c}
+.intake-tag.on{background:#202430;border-color:#202430;color:white}
+.intake-card-left.over{color:#b42318}
+.intake-chat-top{gap:8px;align-items:center}
+.intake-restart{min-height:32px;margin-bottom:6px;padding:0 4px;background:transparent;font-size:12px;color:var(--muted)}
 .online-app .intake-item textarea{flex:1;min-width:0;min-height:40px;field-sizing:content;border:0;padding:9px 0;resize:none;font-size:14px;line-height:1.6;background:transparent;color:var(--ink)}
 .online-app .intake-item textarea:focus{outline:0}
 .intake-item-remove{flex-shrink:0;display:grid;place-items:center;width:40px;height:40px;background:transparent;color:#68748a}
@@ -160,6 +168,7 @@
 .intake-review{margin-top:22px;background:white;border:1px solid var(--line);border-radius:24px;padding:18px 18px 8px;scroll-margin-top:12px}
 .intake-review header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px}
 .intake-review h2{margin:0;font-size:16px}
+.intake-review header>span{font-size:12px;color:var(--muted)}
 #intake-review-state{font-size:12px;color:var(--muted)}
 .intake-review.stale{border-color:#e7c66b;background:#fffdf5}
 .intake-review.stale #intake-review-state{color:#8a6410}
@@ -197,3 +206,42 @@
 .intake-saved-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}
 .intake-saved-actions p{margin:0!important}
 @media(max-height:720px){.intake-simple-page .topbar{min-height:68px;padding-block:10px}.intake-simple-page .main{padding-top:6px}.intake-simple-page .station-example-bar{margin-bottom:8px}.intake-add-empty{min-height:78px}.intake-materials{margin-bottom:12px}.online-app .intake-writing textarea{min-height:152px;height:152px;padding:16px 18px 6px}.intake-record-area{padding-top:18px;gap:10px}.intake-record-button{width:78px;height:78px;border-radius:27px}.intake-record-button svg{width:31px;height:31px}#intake-confirm.intake-save-dock{padding-block:10px max(12px,env(safe-area-inset-bottom))}}
+.daily-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.daily-spacer{flex:1}
+.daily-who{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 10px 0 4px;border-radius:999px;background:white;border:1px solid var(--line);font-size:15px;color:var(--ink)}
+.daily-who:disabled{opacity:1}
+.daily-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.daily-avatar.initial,.daily-pick-avatar.initial{display:grid;place-items:center;background:#eef0f6;color:#3d4a5c;font-weight:600}
+.daily-date-chip{display:inline-flex;align-items:center;gap:2px;min-height:36px;padding:0 10px 0 14px;border-radius:999px;border:1px solid #cbd2e0;background:white;font-size:13px;color:var(--ink)}
+.daily-date-chip svg{width:16px;height:16px}
+.daily-date-chip.open{background:#202430;border-color:#202430;color:white}
+.daily-body{gap:12px}
+.daily-entry{background:white;border:1px solid var(--line);border-radius:20px;padding:14px 16px}
+.daily-entry header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.daily-entry.correcting{border:1.5px solid #202430}
+.online-app .daily-entry textarea{display:block;width:100%;min-height:72px;field-sizing:content;border:0;padding:0;resize:none;font-size:16px;line-height:1.7;background:transparent;color:var(--ink)}
+.online-app .daily-entry textarea:focus{outline:0}
+.daily-original{margin:0 0 10px;font-size:14px;color:#9aa3b5}
+.daily-original small,.daily-change-label{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.daily-thumbs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.daily-thumb{position:relative;width:76px;height:76px;border-radius:12px;overflow:hidden;background:#eef0f6}
+.daily-thumb img{width:100%;height:100%;object-fit:cover}
+.daily-thumb-remove{position:absolute;top:2px;right:2px;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#1c2431cc;color:white}
+.daily-thumb-remove svg{width:14px;height:14px}
+.daily-save{min-height:50px;border-radius:16px}
+.daily-sheet{flex-shrink:0;margin:0 -3px;padding:14px 16px 6px;background:white;border-top:1px solid var(--line);border-radius:20px 20px 0 0}
+.daily-sheet h2{margin:0 0 6px;font-size:15px}
+.daily-sheet-option{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:46px;padding:0 2px;border:0;border-top:1px solid #eef0f4;background:transparent;font-size:15px;color:var(--ink);text-align:left}
+.daily-sheet-option[aria-pressed=true]{font-weight:600}
+.daily-sheet-option svg{width:18px;height:18px}
+.online-app .daily-sheet-option input{width:auto;min-height:36px;border:1px solid var(--line);border-radius:10px;padding:0 8px;font-size:14px}
+.daily-sheet p{margin:6px 0 0;font-size:12px;color:var(--muted)}
+.daily-caption-text,#daily-caption{margin:0;font-size:18px;line-height:1.55;min-height:28px;color:var(--ink)}
+.daily-picker h2{margin:6px 0 10px;font-size:13px;font-weight:600;color:var(--muted)}
+.daily-pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:12px;margin-bottom:16px}
+.daily-pick{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:96px;padding:6px 0;background:transparent;font-size:13px;color:var(--ink)}
+.daily-pick-avatar{width:60px;height:60px;border-radius:50%;object-fit:cover}
+.online-card.just-added{border:1.5px solid #c6ed5b;background:#fbfff0}
+.record-status span{font-size:12px;color:var(--muted)}
+.record-visuals{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.record-visuals img,.record-visuals video{width:88px;height:88px;border-radius:10px;object-fit:cover;background:#eef0f6}

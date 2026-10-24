@@ -17,7 +17,7 @@ try{
  for(let i=0;i<8&&!(await page.locator('#intake-confirm').count());i++){await page.locator('#intake-record').click();await intake('send');await page.locator('.intake-bubble.ai.pending').waitFor({state:'detached'});}
  await page.screenshot({path:'.preview/v12/intake-chat.png',fullPage:true});
  await page.locator('#intake-confirm button').click();await page.locator('.station-pet-cover').waitFor();assert.match(await page.locator('.topbar-title').textContent(),/待命名小猫/);assert.ok((await page.locator('.main').textContent()).includes('人靠近时会躲'));assert.equal(await page.locator('[aria-label="向领养者公开"]').getAttribute('aria-checked'),'false');
- await scene('voice');await click('sample-observation');assert.match(await page.locator('#observation-text').inputValue(),/今天换粮后有点软便/);assert.match(await page.locator('.topbar-title').textContent(),/给宠物补充/);await click('submit-text');await page.getByText('今天换粮后有点软便',{exact:false}).first().waitFor();
+ await scene('voice');await page.locator('[data-daily=pick]').first().click();await page.locator('#daily-record').click();assert.match(await page.locator('#daily-text').inputValue(),/今天换粮后有点软便/);assert.match(await page.locator('.topbar-title').textContent(),/补充日常/);await page.locator('[data-daily=save]').click();await page.getByText('今天换粮后有点软便',{exact:false}).first().waitFor();
  assert.deepEqual(errors,[]);assert.deepEqual(apiCalls,[]);
  console.log(JSON.stringify({scenes:stationScenes.length,photoVoiceConfirm:true,privateDefault:true,exampleApiCalls:0,errors}));
 }finally{await browser.close();}

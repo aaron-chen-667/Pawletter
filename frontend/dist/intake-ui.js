@@ -37,11 +37,15 @@ export function temporaryName(species,at=new Date()){
 // The organiser reads only what the rescuer actually said; "unsure" replies travel as declined dimensions.
 const transcriptOf=turns=>turns.filter(t=>t.role==='me'&&!t.kind&&t.text).map(t=>t.text).join('\n');
 // The card lists the organised record sentence by sentence under the same topics the knowledge base uses.
-const itemsFrom=text=>text.split(/(?<=[。！？；\n])/).map(t=>t.trim()).filter(Boolean).map(text=>({id:crypto.randomUUID(),topic:topicOf(text),text}));
+// Same defaults the knowledge worker applies: hedged words are pending, health and one-off moments are observations.
+const certaintyOf=(text,topic)=>/可能|怀疑|不确定|待核实|不清楚|待确认/.test(text)?'pending':topic==='health'||!/一直|每天|通常|平时|长期|每次|习惯/.test(text)?'observation':'ongoing';
+const certaintyLabels={ongoing:'长期',observation:'这次',pending:'待确认'},nextCertainty={ongoing:'observation',observation:'pending',pending:'ongoing'};
+const itemsFrom=text=>text.split(/(?<=[。！？；\n])/).map(t=>t.trim()).filter(Boolean).map(text=>{const topic=topicOf(text);return {id:crypto.randomUUID(),topic,text,certainty:certaintyOf(text,topic),shared:true};});
+const sharedItems=items=>items.filter(i=>i.shared!==false);
 const descriptionOf=items=>knowledgeTopics.flatMap(q=>items.filter(i=>i.topic===q.key&&i.text.trim()).map(i=>i.text.trim().replace(/[^。！？；]$/,'$&。'))).join('');
 
 export function createIntakeUI({api,exampleMode,root,redraw,onDone,getDraftKey=()=>exampleMode?'example':'station',draftStore=createIntakeDraftStore(),speech=createOnboardingSpeech(),modeStore=localModeStore}){
- let s,owner,epoch=0,active=false,recordingStarted=false,preview=null,mode=modeStore.get()==='text'?'text':'voice';
+ let s,owner,epoch=0,active=false,recordingStarted=false,preview=null,resume=false,mode=modeStore.get()==='text'?'text':'voice';
  const capture=createCaptureController({onChange:updateRecording,onError(message){if(s)s.error=message;updateRecording();}});
  const talk=createPressToTalk({capture,onChange:updateRecording,onSend:transcribe});
  const camera=createIntakeCamera({root,onCapture:async item=>{if(await addMedia([item])===false)throw Error(s?.error||'素材未能添加，请重试。');},onError:message=>{if(active&&s){s.error=message;redraw();}}});
@@ -71,12 +75,12 @@ export function createIntakeUI({api,exampleMode,root,redraw,onDone,getDraftKey=(
   stop();const ticket=++epoch,key=getDraftKey();if(!key)return;
   if(owner!==key){owner=key;s=null;}
   if(!s){try{const saved=await draftStore.load(key);if(ticket!==epoch)return;s=restore(saved);}catch{if(ticket!==epoch)return;s=empty();s.storageError='草稿存储不可用，请暂时不要关闭页面。';}}
-  s={...s,busy:false};active=true;
+  s={...s,busy:false};active=true;resume=true;
  }
  function stop(){if(active&&s){remember();void persist();}active=false;epoch++;talk.cancel();speech.cancel();capture.emergencyStop();void camera.stop();preview?.close();preview?.remove();preview=null;}
  const locked=()=>!!s?.busy||talk.state.holding||talk.state.finishing;
  const hasContent=state=>!!state.text.trim()||state.media.length>0;
- const canSave=()=>s&&(!!s.commit||complete())&&!locked()&&!s.audio;
+ const canSave=()=>s&&(!!s.commit||complete()&&descriptionOf(sharedItems(s.review.items)).length<=fieldLimits.description)&&!locked()&&!s.audio;
  function button(label,action,cls='text-button',extra=''){return `<button type="button" class="${cls}" data-intake="${action}" ${locked()||s.commit?'disabled':''} ${extra}>${label}</button>`;}
  function mediaBubble(t){
   const items=t.mediaIds.map(id=>s.media.find(m=>m.id===id)).filter(Boolean);
@@ -96,9 +100,10 @@ export function createIntakeUI({api,exampleMode,root,redraw,onDone,getDraftKey=(
   const f=r?.fields||{},off=locked()||!!s.commit;
   const choices=(field,label,labels)=>`<div class="intake-review-row"><span>${label}</span><div class="intake-segment" role="radiogroup" aria-label="${label}">${Object.entries(labels).map(([value,text])=>`<button type="button" role="radio" aria-checked="${f[field]===value}" data-review-choice="${field}" data-value="${value}" ${off?'disabled':''}>${text}</button>`).join('')}</div></div>`;
   const input=(field,label,placeholder)=>`<label class="intake-review-row"><span>${label}</span><input data-review-field="${field}" value="${esc(f[field])}" placeholder="${esc(placeholder)}" maxlength="${fieldLimits[field]}" ${off?'readonly':''}></label>`;
-  const topics=r?knowledgeTopics.map(q=>{const items=r.items.filter(i=>i.topic===q.key);if(q.key==='other'&&!items.length)return '';return `<div class="intake-topic"><h3>${q.label}</h3>${items.length?items.map(i=>`<div class="intake-item"><textarea data-item="${esc(i.id)}" rows="1" maxlength="1000" aria-label="${q.label}" ${off?'readonly':''}>${esc(i.text)}</textarea>${button(icons.close,'remove-item','intake-item-remove',`data-id="${esc(i.id)}" aria-label="删除这条"`)}</div>`).join(''):'<p class="intake-topic-empty">还没有</p>'}${button('＋ 添加一条','add-item','intake-item-add',`data-topic="${q.key}"`)}</div>`;}).join(''):'';
+  const topics=r?knowledgeTopics.map(q=>{const items=r.items.filter(i=>i.topic===q.key);if(q.key==='other'&&!items.length)return '';return `<div class="intake-topic"><h3>${q.label}</h3>${items.length?items.map(i=>{const certainty=i.certainty||certaintyOf(i.text,i.topic),local=i.shared===false;return `<div class="intake-item${local?' local':''}"><div class="intake-item-main"><textarea data-item="${esc(i.id)}" rows="1" maxlength="1000" aria-label="${q.label}" ${off?'readonly':''}>${esc(i.text)}</textarea>${button(icons.close,'remove-item','intake-item-remove',`data-id="${esc(i.id)}" aria-label="删除这条"`)}</div><div class="intake-item-tags">${button(certaintyLabels[certainty],'item-certainty','intake-tag',`data-id="${esc(i.id)}" aria-label="${certaintyLabels[certainty]}，点一下切换长期、这次或待确认"`)}${button('仅本站','item-local',`intake-tag${local?' on':''}`,`data-id="${esc(i.id)}" aria-pressed="${local}"`)}</div></div>`;}).join(''):'<p class="intake-topic-empty">还没有</p>'}${button('＋ 添加一条','add-item','intake-item-add',`data-topic="${q.key}"`)}</div>`;}).join(''):'';
   const fields=r?`${input('name','名字',temporaryName(f.species,s.createdAt))}${choices('species','种类',speciesLabels)}${choices('sex','性别',sexLabels)}${input('age','年龄','未知')}${input('character','长期性格','未知')}${topics}${r.uncertainties.length?`<ul class="intake-review-notes" aria-label="待确认">${r.uncertainties.map(u=>`<li>${esc(u)}</li>`).join('')}</ul>`:''}`:'';
-  const footer=s.commit||complete()?`<form id="intake-confirm"><button class="button primary full" ${canSave()?'':'disabled'}>${confirmLabel()}</button></form>`:`<p class="intake-card-left">还差 ${left.map(d=>dimensionLabels[d]).join('、')}，回答或点「暂时不清楚」后就能入档。</p>`;
+  const length=r?descriptionOf(sharedItems(r.items)).length:0,tooLong=length>fieldLimits.description;
+  const footer=s.commit||complete()?`${length>3500?`<p class="intake-card-left${tooLong?' over':''}">对外内容 ${length} / ${fieldLimits.description} 字${tooLong?'，请删减或把部分设为仅本站':''}</p>`:''}<form id="intake-confirm"><button class="button primary full" ${canSave()?'':'disabled'}>${confirmLabel()}</button></form>`:`<p class="intake-card-left">还差 ${left.map(d=>dimensionLabels[d]).join('、')}，回答或点「暂时不清楚」后就能入档。</p>`;
   return `<section class="intake-review" aria-labelledby="intake-review-title"><header><h2 id="intake-review-title">档案</h2><span>每项都能直接修改</span></header>${fields}${footer}</section>`;
  }
  function progressView(){
@@ -111,7 +116,7 @@ export function createIntakeUI({api,exampleMode,root,redraw,onDone,getDraftKey=(
   if(!s)return '<p role="status">正在恢复草稿…</p>';
   const turns=[{id:'greeting',role:'ai',text:greeting},...s.turns];
   const lastAi=turns.map(t=>t.role).lastIndexOf('ai');
-  return `<section class="intake-chat-flow"><div class="intake-chat-top">${progressView()}</div><div class="intake-chat" aria-live="polite">${turns.map((t,i)=>turnView(t,i===lastAi&&i===turns.length-1)).join('')}${s.busy&&!s.commit?'<div class="intake-bubble ai pending">正在整理…</div>':''}${s.error?`<div class="intake-chat-error"><p class="online-error" id="intake-error" role="alert">${esc(s.error)}</p>${!s.commit&&hasContent(s)&&!reviewFresh()&&!s.audio?button('重新整理','retry-organise'):''}</div>`:'<p class="online-error" id="intake-error" role="alert"></p>'}${cardView()}<p class="online-error" id="intake-storage-error" role="status">${esc(s.storageError||'')}</p></div>
+  return `<section class="intake-chat-flow"><div class="intake-chat-top">${s.turns.length&&!s.commit?button('重新开始','restart','intake-restart'):''}${progressView()}</div><div class="intake-chat" aria-live="polite">${turns.map((t,i)=>turnView(t,i===lastAi&&i===turns.length-1)).join('')}${s.busy&&!s.commit?'<div class="intake-bubble ai pending">正在整理…</div>':''}${s.error?`<div class="intake-chat-error"><p class="online-error" id="intake-error" role="alert">${esc(s.error)}</p>${!s.commit&&hasContent(s)&&!reviewFresh()&&!s.audio?button('重新整理','retry-organise'):''}</div>`:'<p class="online-error" id="intake-error" role="alert"></p>'}${cardView()}<p class="online-error" id="intake-storage-error" role="status">${esc(s.storageError||'')}</p></div>
 ${composerView()}
 <input hidden id="intake-album" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple><input hidden id="intake-document" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple></section>`;
  }
@@ -245,6 +250,8 @@ ${composerView()}
   if(a==='edit'){s.editing=b.dataset.id;redraw();root.querySelector('#intake-edit')?.focus();return;}
   if(a==='cancel-edit'){s.editing=null;redraw();return;}
   if(a==='add-item'&&s.review){const item={id:crypto.randomUUID(),topic:b.dataset.topic,text:''};s.review.items.push(item);markEdited('items');await persist();redraw();root.querySelector(`[data-item="${item.id}"]`)?.focus();return;}
+  if(a==='item-certainty'||a==='item-local'){const item=s.review?.items.find(i=>i.id===b.dataset.id);if(item){if(a==='item-local')item.shared=item.shared===false;else item.certainty=nextCertainty[item.certainty||certaintyOf(item.text,item.topic)];markEdited('items');}}
+  if(a==='restart'){if(!confirm('清空这次的对话和素材，重新开始？'))return;epoch++;s=empty();await persist();redraw();return;}
   if(a==='remove-item'&&s.review){s.review.items=s.review.items.filter(i=>i.id!==b.dataset.id);markEdited('items');}
   if(a==='attachments')s.panel=!s.panel;
   if(a==='discard-audio'){s.audio='';s.audioText='';s.voiceBase='';s.error='';}
@@ -299,8 +306,10 @@ ${composerView()}
   const saving=s,savingOwner=owner,ticket=epoch;s.busy=true;s.error='';s.panel=false;redraw();await persist();
   try{
    if(!saving.commit){
+    // A guided server stores the card's notes as reviewed; older servers receive the description only.
+    const notes=Object.keys(saving.review.coverage).length?saving.review.items.filter(i=>i.text.trim()).map(i=>({topic:i.topic,quote:i.text.trim(),certainty:i.certainty||certaintyOf(i.text,i.topic),shared:i.shared!==false})):[];
     const f=saving.review.fields,photos=saving.media.filter(m=>m.kind==='photo').map(m=>m.dataUrl),video=saving.media.find(m=>m.kind==='video');
-    saving.commit={name:f.name.trim()||temporaryName(f.species,saving.createdAt),profile:{species:f.species,description:descriptionOf(saving.review.items)||saving.text.trim(),age:f.age.trim(),character:f.character.trim(),sex:f.sex},published:false,text:saving.text,ocrText:saving.review.ocrText,photos:photos.length?photos:video?[video.frames[0]]:[],documents:saving.media.filter(m=>m.kind==='document').map(({name,dataUrl})=>({name:name||'材料图片',dataUrl})),...(video?{video:video.dataUrl}:{})};
+    saving.commit={name:f.name.trim()||temporaryName(f.species,saving.createdAt),profile:{species:f.species,description:notes.length?descriptionOf(sharedItems(saving.review.items)):descriptionOf(saving.review.items)||saving.text.trim(),age:f.age.trim(),character:f.character.trim(),sex:f.sex},published:false,text:saving.text,ocrText:saving.review.ocrText,photos:photos.length?photos:video?[video.frames[0]]:[],documents:saving.media.filter(m=>m.kind==='document').map(({name,dataUrl})=>({name:name||'材料图片',dataUrl})),...(video?{video:video.dataUrl}:{}),...(notes.length?{notes}:{})};
     if(new TextEncoder().encode(JSON.stringify(saving.commit)).length>20*1024*1024){saving.commit=null;throw Error('素材总量超过限制，请移除部分素材后重试。');}
     await persist();if(!active||epoch!==ticket||s!==saving)return;redraw();
    }
@@ -323,6 +332,8 @@ ${composerView()}
  }
  function bind(){
   if(!active||!s)return;
+  // A rescuer who left while the AI was replying gets that reply when they come back.
+  if(resume){resume=false;if(!s.commit&&!s.audio&&!s.error&&hasContent(s)&&!reviewFresh())queueMicrotask(()=>void organiseNow());}
   const chat=root.querySelector('.intake-chat');if(chat&&!s.cardOpen&&!s.editing)chat.scrollTop=chat.scrollHeight;
   updateRecording();
  }
@@ -338,5 +349,6 @@ ${composerView()}
   if(!active||!s||e.target.id!=='intake-answer'||locked()||s.commit)return;remember();if(s.error&&!s.audio)s.error='';void persist();updateControls();const error=root.querySelector('#intake-error');if(error)error.textContent=s.error;});
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&active){remember();void persist();if(talk.state.holding)void talk.end();void camera.stop();}});
  window.addEventListener('pagehide',stop);
- return {render,bind,reset,stop,get busy(){return locked()||camera.active;}};
+ // Leaving is only blocked while archiving, recording or capturing; an unfinished AI reply resumes on return.
+ return {render,bind,reset,stop,get busy(){return locked()||camera.active;},get blocking(){return (!!s?.busy&&!!s?.commit)||talk.state.holding||talk.state.finishing||camera.active;}};
 }

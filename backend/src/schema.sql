@@ -92,3 +92,7 @@ CREATE TABLE IF NOT EXISTS rescue_followups (
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS followup_active ON rescue_followups(application_id) WHERE status<>'completed';
+
+-- Daily records: when the event happened (entry time stays created_at) and the photos or video saved with it.
+ALTER TABLE observations ADD COLUMN IF NOT EXISTS observed_on date;
+ALTER TABLE media ADD COLUMN IF NOT EXISTS observation_id text REFERENCES observations(id);

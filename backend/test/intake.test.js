@@ -98,3 +98,23 @@ test('failed attachment storage rolls back the new pet and removes earlier store
  finally{storage.put=put;}
  assert.equal((await db.query('SELECT count(*) AS count FROM pets')).rows[0].count,beforePets);assert.equal(blobs.size,stored);
 });
+test('reviewed card notes are archived as written, and station-only notes never reach the agent',async()=>{
+ const notes=[{topic:'likes',quote:'平时最爱追逗猫棒。',certainty:'ongoing',shared:true},{topic:'health',quote:'疫苗记录待核实。',certainty:'pending',shared:true},{topic:'other',quote:'送来的人电话已存交接表。',certainty:'observation',shared:false}];
+ const body={name:'桔子',profile:{species:'cat',description:'平时最爱追逗猫棒。疫苗记录待核实。'},published:false,text:'原始口述。',ocrText:'',photos:[],notes},key=randomUUID();
+ const first=await request(station,'POST','/v1/intake/commit',body,{'idempotency-key':key});assert.equal(first.statusCode,201,first.body);const id=first.json().id;
+ assert.deepEqual((await request(station,'POST','/v1/intake/commit',body,{'idempotency-key':key})).json(),first.json());
+ const records=(await db.query('SELECT share_with_agent,status,original_text FROM observations WHERE pet_id=$1 ORDER BY share_with_agent DESC',[id])).rows;
+ assert.deepEqual(records.map(r=>[r.share_with_agent,r.status]),[[true,'archived'],[false,'archived']]);
+ const station_notes=(await request(station,'GET',`/v1/pets/${id}/knowledge`)).json().notes.map(n=>[n.topic,n.quote,n.certainty]).sort();
+ assert.deepEqual(station_notes,notes.map(n=>[n.topic,n.quote,n.certainty]).sort());
+ assert.equal((await db.query("SELECT count(*)::int AS n FROM observations WHERE pet_id=$1 AND status='queued'",[id])).rows[0].n,0,'Reviewed notes are not re-classified by the worker');
+ const published=await request(station,'POST',`/v1/pets/${id}/profile`,{name:'桔子',profile:(await request(station,'GET',`/v1/pets/${id}`)).json().profile,published:true});assert.equal(published.statusCode,200,published.body);
+ const adopterNotes=(await request(adopter,'GET',`/v1/pets/${id}/knowledge`)).json().notes.map(n=>n.quote);
+ assert.deepEqual(adopterNotes.sort(),['平时最爱追逗猫棒。','疫苗记录待核实。'].sort());
+ const bad=await request(station,'POST','/v1/intake/commit',{...body,notes:[{...notes[0],topic:'secrets'}]},{'idempotency-key':randomUUID()});assert.equal(bad.statusCode,400);
+});
+test('guided coverage reopens a declined dimension once the rescuer answers it',async()=>{
+ ai.draftIntake=async()=>({name:'',species:'cat',description:'打过疫苗。',character:'',age:'',sex:'unknown',ocrText:'',uncertainties:[],coverage:{health:'covered'}});
+ const analyzed=await request(station,'POST','/v1/intake/analyze',{text:'健康不清楚。\n后来想起来打过疫苗。',images:[],declined:['health','sex']});
+ assert.equal(analyzed.statusCode,200,analyzed.body);assert.equal(analyzed.json().coverage.health,'covered');assert.equal(analyzed.json().coverage.sex,'unknown');
+});

@@ -9,7 +9,7 @@ export function createObservationSender(client, uuid=()=>crypto.randomUUID()) {
       if(running)throw new Error('SUBMISSION_BUSY');
       if(!pending){
         if(!input?.petId||(!input.text?.trim()&&!input.audio))throw new Error('EMPTY_OBSERVATION');
-        pending={petId:input.petId,audio:input.audio,key:uuid(),body:{text:input.text?.trim()||'',shareWithAgent:!!input.shareWithAgent,...(input.replacesId?{replacesId:input.replacesId}:{})}};
+        pending={petId:input.petId,audio:input.audio,key:uuid(),body:{text:input.text?.trim()||'',shareWithAgent:!!input.shareWithAgent,...(input.replacesId?{replacesId:input.replacesId}:{}),...(input.observedOn?{observedOn:input.observedOn}:{}),...(input.photos?.length?{photos:input.photos}:{}),...(input.video?{video:input.video}:{})}};
       }
       running=true;
       try {

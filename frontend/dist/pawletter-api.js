@@ -31,7 +31,7 @@ export function createPawletterClient(baseUrl, fetcher=fetch) {
     async uploadAudio(petId,blob){return call(`/v1/pets/${encodeURIComponent(petId)}/audio`,{method:'POST',body:blob,headers:{'Content-Type':blob.type.split(';')[0]}});},
     submitObservation:(petId,body,idempotencyKey)=>call(`/v1/pets/${encodeURIComponent(petId)}/observations`,{method:'POST',body,headers:{'Idempotency-Key':idempotencyKey}}),
     processObservation:id=>call(`/v1/observations/${encodeURIComponent(id)}/process`,{method:'POST'}),
-    observations:(petId,filters={})=>call(`/v1/pets/${encodeURIComponent(petId)}/observations?${new URLSearchParams(filters)}`),
+    async observations(petId,filters={}){const data=await call(`/v1/pets/${encodeURIComponent(petId)}/observations?${new URLSearchParams(filters)}`);await Promise.all((data.observations||[]).flatMap(o=>(o.visuals||[]).map(async v=>v.url=await visual(v.url))));return data;},
     withdrawObservation:id=>call(`/v1/observations/${encodeURIComponent(id)}`,{method:'DELETE'}),
     retryObservation:id=>call(`/v1/observations/${encodeURIComponent(id)}/retry`,{method:'POST'}),
     knowledge:petId=>call(`/v1/pets/${encodeURIComponent(petId)}/knowledge`),

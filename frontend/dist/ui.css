@@ -102,6 +102,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 .messages-page .consent-card{padding:12px 14px;margin:0 0 16px;gap:10px}
 .messages-page .consent-card strong{font-size:13px}
 .messages-page .consent-card p{font-size:11px;margin-top:4px}
+.catalog-state{margin:24px 0;padding:32px 20px;text-align:center;border:1px solid #e2e6f0;border-radius:24px;background:#fff}
+.catalog-state h2{font-size:20px;line-height:1.4;margin:0 0 12px}
+.catalog-state p{font-size:14px;line-height:1.8;color:var(--muted);margin:0 auto 24px;max-width:28em}
+.catalog-state-icon{display:inline-grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#f0efff;color:#6258ca;margin-bottom:16px}
+.catalog-state[role=status] p{margin-bottom:0}
 .messages-page .empty{padding:32px 16px}
 .messages-page .empty h3{font-size:19px}
 .messages-page .empty p{max-width:27em;margin-left:auto;margin-right:auto;font-size:13px;line-height:1.8}

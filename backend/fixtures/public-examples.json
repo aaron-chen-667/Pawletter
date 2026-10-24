@@ -1,0 +1,529 @@
+[
+  {
+    "id": "example-pet-orange",
+    "name": "橘子",
+    "stationId": "example-station-warm",
+    "stationName": "暖爪救助站 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "male",
+      "age": "约 1 岁",
+      "city": "杭州",
+      "character": "慢热、熟悉后亲人",
+      "description": "【虚构示例档案】刚见面时，我会先偷偷观察你。等熟悉了，就想在你身边找个舒服的位置，一起发发呆。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/orange.jpg",
+      "latitude": 30.284,
+      "longitude": 120.168
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "慢热、熟悉后亲人。刚见面时，我会先偷偷观察你。等熟悉了，就想在你身边找个舒服的位置，一起发发呆。"
+      },
+      {
+        "topic": "health",
+        "quote": "示例记录：已绝育；疫苗记录待核实"
+      },
+      {
+        "topic": "other",
+        "quote": "愿意耐心陪伴适应，家庭成员同意领养"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-tabby",
+    "name": "芝麻",
+    "stationId": "example-station-garden",
+    "stationName": "小院猫咪之家 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "female",
+      "age": "约 2 岁",
+      "city": "杭州",
+      "character": "安静、独立",
+      "description": "【虚构示例档案】我喜欢有阳光的窗边，也喜欢不慌不忙的陪伴。你忙你的，我在旁边就很好。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/tabby.jpg",
+      "latitude": 30.31,
+      "longitude": 120.128
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "安静、独立。我喜欢有阳光的窗边，也喜欢不慌不忙的陪伴。你忙你的，我在旁边就很好。"
+      },
+      {
+        "topic": "health",
+        "quote": "示例记录：已绝育；其他记录待确认"
+      },
+      {
+        "topic": "other",
+        "quote": "提供安全的室内环境，愿意了解猫的边界"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-dog",
+    "name": "布丁",
+    "stationId": "example-station-sun",
+    "stationName": "阳光小爪救助站 · 示例",
+    "profile": {
+      "species": "dog",
+      "sex": "male",
+      "age": "约 2 岁",
+      "city": "上海",
+      "character": "活泼、亲人",
+      "description": "【虚构示例档案】散步、闻闻草地、陪你走一段路，是我每天最期待的事。希望你也愿意给散步留一点时间。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog.jpg",
+      "latitude": 31.23,
+      "longitude": 121.474
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "活泼、亲人。散步、闻闻草地、陪你走一段路，是我每天最期待的事。希望你也愿意给散步留一点时间。"
+      },
+      {
+        "topic": "health",
+        "quote": "示例记录：健康及免疫情况待确认"
+      },
+      {
+        "topic": "other",
+        "quote": "每天能够安排遛狗与陪伴时间"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-tangyuan",
+    "name": "汤圆",
+    "stationId": "example-station-warm",
+    "stationName": "暖爪救助站 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "male",
+      "age": "约 1 岁 8 个月",
+      "city": "杭州",
+      "character": "亲人、好奇，见陌生人会先观察",
+      "description": "【虚构示例档案】喜欢看窗外的鸟，吃饭前会轻轻叫两声。熟悉后会在沙发另一端陪你，不太喜欢被长时间抱着。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-01.jpg",
+      "latitude": 30.284,
+      "longitude": 120.168
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "亲人、好奇，见陌生人会先观察。喜欢看窗外的鸟，吃饭前会轻轻叫两声。熟悉后会在沙发另一端陪你，不太喜欢被长时间抱着。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；已有两次免疫登记，接种凭证见面时核对"
+      },
+      {
+        "topic": "other",
+        "quote": "室内饲养、封窗，接受它不爱被抱的边界"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-ash",
+    "name": "阿灰",
+    "stationId": "example-station-garden",
+    "stationName": "小院猫咪之家 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "male",
+      "age": "约 4 岁",
+      "city": "杭州",
+      "character": "安静、慢热，需要稳定作息",
+      "description": "【虚构示例档案】我有自己的休息时间，不会一直追着你跑。你坐下来读书，我可能就靠近一点点。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-02.jpg",
+      "latitude": 30.31,
+      "longitude": 120.128
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "安静、慢热，需要稳定作息。我有自己的休息时间，不会一直追着你跑。你坐下来读书，我可能就靠近一点点。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；体检登记需要新家庭与救助者共同核对"
+      },
+      {
+        "topic": "other",
+        "quote": "愿意持续关注活动变化，避免强迫互动"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-toast",
+    "name": "吐司",
+    "stationId": "example-station-warm",
+    "stationName": "暖爪救助站 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "female",
+      "age": "约 3 岁",
+      "city": "杭州",
+      "character": "温和、熟悉后亲人，喜欢午睡",
+      "description": "【虚构示例档案】我喜欢松软的毯子，会把一天的大部分时间分给睡觉。醒来以后，愿意跟你玩几分钟逗猫棒。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-03.jpg",
+      "latitude": 30.284,
+      "longitude": 120.168
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "温和、熟悉后亲人，喜欢午睡。我喜欢松软的毯子，会把一天的大部分时间分给睡觉。醒来以后，愿意跟你玩几分钟逗猫棒。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；驱虫登记齐全，免疫凭证待交接核对"
+      },
+      {
+        "topic": "other",
+        "quote": "愿意缓慢适应，不强行与原住民合笼"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-pine",
+    "name": "松松",
+    "stationId": "example-station-garden",
+    "stationName": "小院猫咪之家 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "male",
+      "age": "约 2 岁 6 个月",
+      "city": "杭州",
+      "character": "谨慎、独立，熟悉后互动积极",
+      "description": "【虚构示例档案】新地方我会先巡逻一圈。你不用着急靠近，把玩具放在旁边，等我主动发出邀请就好。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-04.jpg",
+      "latitude": 30.31,
+      "longitude": 120.128
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "谨慎、独立，熟悉后互动积极。新地方我会先巡逻一圈。你不用着急靠近，把玩具放在旁边，等我主动发出邀请就好。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；本月有例行检查登记，具体报告由站点提供"
+      },
+      {
+        "topic": "other",
+        "quote": "有封闭安全空间，能耐心等待适应"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-rice",
+    "name": "米粒",
+    "stationId": "example-station-warm",
+    "stationName": "暖爪救助站 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "female",
+      "age": "约 10 个月",
+      "city": "杭州",
+      "character": "亲人、活泼，会主动蹭熟人",
+      "description": "【虚构示例档案】熟悉以后我会用脑袋轻轻碰你的手。陪我玩一会儿，再让我自己休息，就是很好的下午。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-05.jpg",
+      "latitude": 30.284,
+      "longitude": 120.168
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "亲人、活泼，会主动蹭熟人。熟悉以后我会用脑袋轻轻碰你的手。陪我玩一会儿，再让我自己休息，就是很好的下午。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；免疫记录已登记，仍需核对原始凭证"
+      },
+      {
+        "topic": "other",
+        "quote": "每天安排互动，接受幼猫阶段的精力和探索"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-wheat",
+    "name": "麦麦",
+    "stationId": "example-station-garden",
+    "stationName": "小院猫咪之家 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "female",
+      "age": "约 8 个月",
+      "city": "杭州",
+      "character": "好奇、活泼，喜欢追逐玩具",
+      "description": "【虚构示例档案】什么东西在动？让我看看。玩累了我会找一个安静角落充电，醒来又是新的探险时间。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-06.jpg",
+      "latitude": 30.31,
+      "longitude": 120.128
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "好奇、活泼，喜欢追逐玩具。什么东西在动？让我看看。玩累了我会找一个安静角落充电，醒来又是新的探险时间。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：免疫程序仍在按记录推进；绝育安排需与站点确认"
+      },
+      {
+        "topic": "other",
+        "quote": "了解幼猫照护，能安排后续免疫与绝育沟通"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-tea",
+    "name": "乌龙",
+    "stationId": "example-station-sun",
+    "stationName": "阳光小爪救助站 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "male",
+      "age": "约 5 岁",
+      "city": "上海",
+      "character": "安静、亲人，节奏稳定",
+      "description": "【虚构示例档案】你下班回来时，我会在熟悉的位置等一会儿。不用一直逗我，安安静静坐在一起也很好。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-07.jpg",
+      "latitude": 31.23,
+      "longitude": 121.474
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "安静、亲人，节奏稳定。你下班回来时，我会在熟悉的位置等一会儿。不用一直逗我，安安静静坐在一起也很好。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；有口腔检查待复核项目，费用和安排需提前沟通"
+      },
+      {
+        "topic": "other",
+        "quote": "接受成年动物的持续照护，愿意配合复查"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-cream",
+    "name": "奶盖",
+    "stationId": "example-station-sun",
+    "stationName": "阳光小爪救助站 · 示例",
+    "profile": {
+      "species": "cat",
+      "sex": "male",
+      "age": "约 3 岁 6 个月",
+      "city": "上海",
+      "character": "温和、慢热，不喜欢被突然抱起",
+      "description": "【虚构示例档案】我表情变化不大，喜欢不喜欢要看行动。熟悉后，我会选择在离你不远的地方坐下。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-08.jpg",
+      "latitude": 31.23,
+      "longitude": 121.474
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "温和、慢热，不喜欢被突然抱起。我表情变化不大，喜欢不喜欢要看行动。熟悉后，我会选择在离你不远的地方坐下。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；需进一步核对眼部与呼吸道检查记录"
+      },
+      {
+        "topic": "other",
+        "quote": "能接受定期清洁与健康记录核对"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-cola",
+    "name": "可乐",
+    "stationId": "example-station-warm",
+    "stationName": "暖爪救助站 · 示例",
+    "profile": {
+      "species": "dog",
+      "sex": "male",
+      "age": "约 3 岁",
+      "city": "杭州",
+      "character": "亲人、活泼，学习时注意力较好",
+      "description": "【虚构示例档案】看见牵引绳就会期待出门。散步时我想闻很多地方，你愿意陪我慢一点吗？",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog-01.jpg",
+      "latitude": 30.284,
+      "longitude": 120.168
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "亲人、活泼，学习时注意力较好。看见牵引绳就会期待出门。散步时我想闻很多地方，你愿意陪我慢一点吗？"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；有免疫登记，狂犬疫苗凭证需见面核对"
+      },
+      {
+        "topic": "other",
+        "quote": "能提供规律遛狗时间，愿意持续练习牵引礼仪"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-cloud",
+    "name": "云朵",
+    "stationId": "example-station-sun",
+    "stationName": "阳光小爪救助站 · 示例",
+    "profile": {
+      "species": "dog",
+      "sex": "female",
+      "age": "约 2 岁",
+      "city": "上海",
+      "character": "聪明、敏感，运动需求较高",
+      "description": "【虚构示例档案】新指令我学得很认真，但也会被路边的新鲜气味分心。希望你愿意和我练习，而不是只看我聪不聪明。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog-02.jpg",
+      "latitude": 31.23,
+      "longitude": 121.474
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "聪明、敏感，运动需求较高。新指令我学得很认真，但也会被路边的新鲜气味分心。希望你愿意和我练习，而不是只看我聪不聪明。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；既往免疫信息已登记，待核对原件"
+      },
+      {
+        "topic": "other",
+        "quote": "稳定的活动与训练安排，家庭成员共同参与"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-cookie",
+    "name": "曲奇",
+    "stationId": "example-station-warm",
+    "stationName": "暖爪救助站 · 示例",
+    "profile": {
+      "species": "dog",
+      "sex": "female",
+      "age": "约 4 岁",
+      "city": "杭州",
+      "character": "外向、亲人，嗅闻兴趣强",
+      "description": "【虚构示例档案】你看风景，我闻路边。遇到新气味我会停下来很久，请给我一点探索世界的时间。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog-03.jpg",
+      "latitude": 30.284,
+      "longitude": 120.168
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "外向、亲人，嗅闻兴趣强。你看风景，我闻路边。遇到新气味我会停下来很久，请给我一点探索世界的时间。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；本月体检有登记，耳部护理需求待核实"
+      },
+      {
+        "topic": "other",
+        "quote": "全程牵引出门，能接受持续的日常练习"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-bean",
+    "name": "豆包",
+    "stationId": "example-station-garden",
+    "stationName": "小院猫咪之家 · 示例",
+    "profile": {
+      "species": "dog",
+      "sex": "male",
+      "age": "约 5 岁",
+      "city": "杭州",
+      "character": "温和、亲人，活动节奏较慢",
+      "description": "【虚构示例档案】比起跑很远，我更喜欢轻松走一小段，再在你脚边休息。我们慢慢熟悉对方的生活节奏。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog-04.jpg",
+      "latitude": 30.31,
+      "longitude": 120.128
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "温和、亲人，活动节奏较慢。比起跑很远，我更喜欢轻松走一小段，再在你脚边休息。我们慢慢熟悉对方的生活节奏。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；需核对呼吸与皮肤检查记录，不承诺无照护负担"
+      },
+      {
+        "topic": "other",
+        "quote": "理解短鼻犬照护需求，能够承担复查与日常照护"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-potato",
+    "name": "土豆",
+    "stationId": "example-station-sun",
+    "stationName": "阳光小爪救助站 · 示例",
+    "profile": {
+      "species": "dog",
+      "sex": "female",
+      "age": "约 2 岁 8 个月",
+      "city": "上海",
+      "character": "亲人、好奇，遇陌生狗先观察",
+      "description": "【虚构示例档案】我喜欢坐在门边看你忙。出门时走走停停，回家再找个舒服的角落睡一觉。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog-06.jpg",
+      "latitude": 31.23,
+      "longitude": 121.474
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "亲人、好奇，遇陌生狗先观察。我喜欢坐在门边看你忙。出门时走走停停，回家再找个舒服的角落睡一觉。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；皮肤与呼吸情况需结合检查记录确认"
+      },
+      {
+        "topic": "other",
+        "quote": "有规律照护时间，能理解体型与身体结构带来的需求"
+      }
+    ]
+  },
+  {
+    "id": "example-pet-pancake",
+    "name": "年糕",
+    "stationId": "example-station-garden",
+    "stationName": "小院猫咪之家 · 示例",
+    "profile": {
+      "species": "dog",
+      "sex": "male",
+      "age": "约 1 岁 6 个月",
+      "city": "杭州",
+      "character": "活泼、亲人，有主见",
+      "description": "【虚构示例档案】想一起散步，也想自己选一小段路线。你愿意温柔又坚定地陪我练习，我就愿意慢慢学。",
+      "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog-07.jpg",
+      "latitude": 30.31,
+      "longitude": 120.128
+    },
+    "notes": [
+      {
+        "topic": "habits",
+        "quote": "活泼、亲人，有主见。想一起散步，也想自己选一小段路线。你愿意温柔又坚定地陪我练习，我就愿意慢慢学。"
+      },
+      {
+        "topic": "health",
+        "quote": "虚构示例记录：已绝育；免疫与基础检查记录待交接核实"
+      },
+      {
+        "topic": "other",
+        "quote": "有耐心做日常训练，家庭可接受过渡期"
+      }
+    ]
+  }
+]

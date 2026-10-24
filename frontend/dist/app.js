@@ -224,7 +224,6 @@ function render() {
     default:body=meetPage();
   }
   if(exampleMode)body=`<div class="example-toolbar"><button data-action="example-scenes">${icon('book')} 示例体验 <span>切换场景</span></button><a href="./">返回正式</a></div>`+body;
-  else if(rootPages.includes(page.name))body=body.replace('</header>','</header><a class="example-launch" href="?examples=1"><span>想先看看完整的领养故事？</span><strong>浏览示例 '+icon('arrow')+'</strong></a>');
   app.innerHTML=`<aside class="desktop-note"><a class="desktop-brand" href="#/">${icon('paw')} PAWLETTER</a><p class="editorial">把相遇，<br>写成回家。</p><p class="desktop-description">一封来自毛茸茸世界的来信。<br>认识它，了解它，然后一起回家。</p><span class="desktop-label">公益领养 · 让陪伴发生</span><div class="desktop-line"></div><p class="desktop-foot">每一个小小的生命，<br>都值得被认真认识。</p></aside><div class="phone-app ${exampleMode?'example-app ':''}${page.name==='chat'?'chat-app':page.name==='lifestyle'&&!lifestyleReview?'interview-app':''}">${body}${rootPages.includes(page.name)?nav():''}</div><aside class="desktop-right"><span>01 / MEET A NEW FRIEND</span><p>让喜欢，<br>有一个真实的去处。</p><button data-action="identity">切换身份 ${icon('arrow')}</button><img class="desktop-qr" src="./assets/qr.png" alt="手机扫码访问" /><small>手机扫码体验</small></aside>`;
   if(exampleMode){
    const composer=app.querySelector('.interview-composer');if(composer)composer.insertAdjacentHTML('afterbegin',button('用一句示例回答体验','example-answer','example-fill','','type="button"'));
@@ -279,6 +278,12 @@ async function disabledLegacyStory(id) {
     toast(id?'已进入虚构故事，原操作记录保留':'已返回你原来的操作记录');
   } catch {toast('切换失败，请检查浏览器存储设置；原记录仍保留。');}
 }
+function catalogStatusView() {
+  if(catalogBusy)return '<section class="catalog-state" role="status" aria-live="polite"><h2>正在加载宠物档案</h2><p>稍等一下，正在读取救助站公开的资料。</p></section>';
+  if(!catalogError)return '';
+  const offline=catalogError==='offline',network=catalogError==='network';
+  return `<section class="catalog-state" role="alert"><span class="catalog-state-icon" aria-hidden="true">${icon('refresh')}</span><h2>${offline?'网络已断开':network?'暂时连接不上服务':'服务暂时不可用'}</h2><p>${offline?'请检查网络连接，恢复后再试。':network?'暂时无法读取宠物档案，请检查网络或稍后重试。':'宠物档案暂时无法读取，请稍后重试。'}</p>${button('重新加载','catalog-retry','button primary')}</section>`;
+}
 function meetPage() {
   const list=discoveryItems();
   const hero=list[0];
@@ -289,12 +294,14 @@ function meetPage() {
     <div class="intro-heading ${saved?'saved-intro':nearby?'nearby-intro':'chance-intro'}"><p class="eyebrow">${saved?'SAVED WITH A LITTLE LOVE.':nearby?'REAL PAWS. REAL CONNECTION.':'A LITTLE CHANCE. A NEW FRIEND.'}</p><h1>${saved?'喜欢的它们，<br>都在<span class="orange">这里。</span>':nearby?'你的附近，<br>有点<span class="orange">可爱。</span>':'下一位心动，<br>刚好<span class="orange">是你。</span>'}</h1><p>${saved?'再看一眼，接着聊聊，把心动慢慢变熟悉。':nearby?'找个离你近的小伙伴，先 say hi。':'让缘分翻一页，和没见过的小可爱打个招呼。'}</p><span class="intro-paw" aria-hidden="true">${icon(saved?'heart':nearby?'paw':'spark')}</span></div>
     <div class="discovery-tabs">${button(icon('pin')+' 附近','discovery-mode',nearby?'active':'','nearby')}${button(icon('spark')+' 随缘遇见','discovery-mode',!nearby&&!saved?'active':'','swipe')}${button(icon('heart')+' 喜欢的','discovery-mode',saved?'active':'','saved')}</div>
     <div class="filter-row" role="group" aria-label="筛选动物">${[['all','全部'],['cat','猫咪'],['dog','狗狗']].map(([id,label])=>button(label,'filter',`filter-chip ${filter===id?'selected':''}`,id)).join('')}</div>`;
+  const catalogStatus=catalogStatusView();
+  if(catalogStatus)return `${opening}${catalogStatus}</main>`;
   if(saved){
     const favorites=state.following.map(id=>activePet(state,id)).filter(p=>p&&(filter==='all'||p.species===(filter==='cat'?'猫':'狗')));
     return `${opening}<p class="saved-count">${favorites.length} 位喜欢的小伙伴</p><div class="saved-pet-list">${favorites.map(p=>`<article class="saved-pet-card"><button class="saved-pet-photo" data-action="profile" data-value="${p.id}" aria-label="查看${esc(p.name)}的档案">${photo(p,'','loading="lazy"')}</button><div class="saved-pet-info"><div class="saved-pet-name"><h2>${esc(p.name)}</h2>${button(icon('heart'),'follow','saved-pet-heart saved',p.id,`aria-label="取消喜欢${esc(p.name)}"`)}</div>${statusPill(p)}<p>${esc(p.age)} · ${esc(p.coat)} · ${esc(p.city)}</p><p class="saved-pet-mood">${esc(p.tags.slice(0,2).join(' · '))}</p><button class="saved-pet-station" data-action="station" data-value="${stationFor(p).id}">${icon('home')} ${esc(stationFor(p).name)} ${icon('chevron')}</button><div class="saved-pet-actions">${button('看档案','profile','button secondary',p.id)}${button(state.messages[p.id]?.length?'继续聊天':'打个招呼','chat','button primary',p.id)}</div></div></article>`).join('')||empty('还没有收藏的小伙伴','遇到心动的它，点一下爱心，下次就能在这里找到。',button('去随缘遇见','discovery-mode','button primary','swipe'))}</div></main>`;
   }
   return `${opening}
-    ${catalogBusy?'<p class="chat-loading" role="status">正在读取救助站公开的宠物档案…</p>':catalogError?`<p class="form-error">${esc(catalogError)}</p>${button('重新加载','catalog-retry','button secondary')}`:''}${hero?`<article class="hero-pet ${!nearby?'swipe-card':''}" ${!nearby?'id="swipe-card"':''} data-pet="${hero.pet.id}">
+    ${hero?`<article class="hero-pet ${!nearby?'swipe-card':''}" ${!nearby?'id="swipe-card"':''} data-pet="${hero.pet.id}">
       ${!nearby?'<span class="swipe-stamp stamp-like">想认识</span><span class="swipe-stamp stamp-skip">下一位</span>':''}
       <button class="hero-image-button" data-action="profile" data-value="${hero.pet.id}" aria-label="了解${esc(hero.pet.name)}">${photo(hero.pet,'hero-image','fetchpriority="high"')}<span class="image-shade"></span><span class="hero-label">${icon('spark')} 和你有些合拍</span><span class="hero-caption"><span>${esc(hero.pet.name)} <small>${hero.pet.sex==='男孩子'?'♂':'♀'}</small></span><span class="hero-location">${esc(hero.pet.age)} · ${esc(hero.pet.city)}</span></span></button>
       ${button(icon('heart'),'follow',`save-button ${state.following.includes(hero.pet.id)?'saved':''}`,hero.pet.id,`aria-label="${state.following.includes(hero.pet.id)?'取消关注':'关注'}${esc(hero.pet.name)}"`)}
@@ -670,7 +677,7 @@ function renderOverlay() {
   } else if(overlay.type==='location') {
     title='在哪里遇见？';
     const stations=[...new Map(state.pets.map(p=>[p.stationId,stationFor(p)])).values()].map(s=>({...s,distance:distanceKm(state.location,s)})).filter(s=>Number.isFinite(s.distance)&&s.distance<=state.radius).sort((a,b)=>a.distance-b.distance);
-      body=`<p class="modal-intro">当前：${esc(state.location.label)} · ${state.location.source==='live'?'设备定位':state.location.source==='manual'?'手动选择':'默认城市，可更改'}</p>${button(icon('pin')+(locating?' 正在定位…':' 使用我的当前位置'),'locate','button primary full','',locating?'disabled':'')}<p class="footnote">定位只在本浏览器用于距离计算，不上传服务器。站点位置尚未完成实地核验。</p>${locationError?`<p class="location-error" role="status">${esc(locationError)}</p>`:''}<form id="location-form" class="form-stack"><div class="form-row"><label>也可以选择城市<select name="city">${Object.keys(cityLocations).map(city=>`<option ${state.location.label===city?'selected':''}>${city}</option>`).join('')}</select></label><label>附近范围<select name="radius">${[5,20,50,300].map(r=>`<option value="${r}" ${state.radius===r?'selected':''}>${r} km</option>`).join('')}</select></label></div><button class="button secondary full" type="submit">使用这个位置与范围</button></form>${sectionHeading('AROUND YOU',stations.length+' 家附近站点')}<div class="nearby-stations">${stations.length?stations.map(s=>`<article><span class="station-icon">${icon('home')}</span><div><strong>${esc(s.name)}</strong><p>${esc(s.city)} · ${esc(s.area)} · ${state.pets.filter(p=>stationFor(p).id===s.id&&p.status==='available'&&p.active).length} 位待领养伙伴</p></div><div class="nearby-station-actions"><small>约 ${distanceLabel(s.distance)}</small>${button('查看主页','station','text-button',s.id)}</div></article>`).join(''):'<p class="body-copy">附近暂无站点，可扩大范围或切换「随缘遇见」。</p>'}</div>`;
+      body=`<p class="modal-intro">当前：${esc(state.location.label)} · ${state.location.source==='live'?'设备定位':state.location.source==='manual'?'手动选择':'默认城市，可更改'}</p>${button(icon('pin')+(locating?' 正在定位…':' 使用我的当前位置'),'locate','button primary full','',locating?'disabled':'')}<p class="footnote">定位只在本浏览器用于距离计算，不上传服务器。站点位置尚未完成实地核验。</p>${locationError?`<p class="location-error" role="status">${esc(locationError)}</p>`:''}<form id="location-form" class="form-stack"><div class="form-row"><label>也可以选择城市<select name="city">${Object.keys(cityLocations).map(city=>`<option ${state.location.label===city?'selected':''}>${city}</option>`).join('')}</select></label><label>附近范围<select name="radius">${[5,20,50,300].map(r=>`<option value="${r}" ${state.radius===r?'selected':''}>${r} km</option>`).join('')}</select></label></div><button class="button secondary full" type="submit">使用这个位置与范围</button></form>${catalogBusy||catalogError?catalogStatusView():`${sectionHeading('AROUND YOU',stations.length+' 家附近站点')}<div class="nearby-stations">${stations.length?stations.map(s=>`<article><span class="station-icon">${icon('home')}</span><div><strong>${esc(s.name)}</strong><p>${esc(s.city)} · ${esc(s.area)} · ${state.pets.filter(p=>stationFor(p).id===s.id&&p.status==='available'&&p.active).length} 位待领养伙伴</p></div><div class="nearby-station-actions"><small>约 ${distanceLabel(s.distance)}</small>${button('查看主页','station','text-button',s.id)}</div></article>`).join(''):'<p class="body-copy">附近暂无站点，可扩大范围或切换「随缘遇见」。</p>'}</div>`}`;
   } else if(overlay.type==='chat-options') {
     const p=activePet(state,overlay.id),muted=state.muted.includes(p.id);
     title='与'+p.name+'的对话';
@@ -724,14 +731,16 @@ async function sendChat(text){
 }
 async function loadCatalog(){
  if(exampleMode){catalogBusy=false;if(initialPetId){const id=initialPetId;initialPetId=null;if(state.pets.some(p=>p.id===id))navigate('profile',id);}render();return;}
- catalogBusy=true;catalogError='';
- try{const result=await accountApi.catalog();catalogRows=result.pets;state.pets=catalogRows.map(cloudPet);if(state.account&&state.consent)greet(state);
+ catalogBusy=true;catalogError='';render();
+ try{const result=await accountApi.catalog();if(!Array.isArray(result?.pets))throw new Error('Invalid catalog response');catalogRows=result.pets;state.pets=catalogRows.map(cloudPet);if(state.account&&state.consent)greet(state);
   if(initialPetId){const id=initialPetId;initialPetId=null;if(state.pets.some(p=>p.id===id))navigate('profile',id);else toast('这份宠物档案暂未公开或已下架，可以看看其他小伙伴。');}
  }
- catch(e){catalogError='宠物档案暂时没有加载成功，请重试。';}
+ catch(e){catalogError=navigator.onLine===false?'offline':e instanceof TypeError?'network':'service';}
  finally{catalogBusy=false;if(['meet','messages','mine','station','stations'].includes(page.name))render();}
 }
 function cloudStationPage(id){
+ const catalogStatus=catalogStatusView();
+ if(catalogStatus)return `${topbar(id?'救助站':'认识救助站','从它的长期档案，认识照顾它的人')}<main class="main">${catalogStatus}</main>`;
  const rows=id?state.pets.filter(p=>p.stationId===id):state.pets,stations=[...new Map(rows.map(p=>[p.stationId,p.stationRecord])).values()];
  return `${topbar(id?(stations[0]?.name||'救助站'):'认识救助站','从它的长期档案，认识照顾它的人')}<main class="main">${stations.length?stations.map(st=>`<section class="application-profile spaced"><h2>${esc(st.name)}</h2><p>${esc(st.city)}</p>${rows.filter(p=>p.stationId===st.id).map(p=>`<button class="menu-item" data-action="profile" data-value="${p.id}">${photo(p,'avatar')}<span><strong>${esc(p.name)}</strong><small>${esc(p.character)}</small></span>${icon('chevron')}</button>`).join('')}</section>`).join(''):empty('还没有公开的宠物档案','救助者发布档案后，会在这里展示。')}</main>`;
 }

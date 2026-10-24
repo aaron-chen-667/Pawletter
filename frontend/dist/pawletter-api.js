@@ -19,6 +19,7 @@ export function createPawletterClient(baseUrl, fetcher=fetch) {
     createFollowup:(body,key)=>call('/v1/followups',{method:'POST',body,headers:{'Idempotency-Key':key}}),
     updateFollowup:(id,body)=>call(`/v1/followups/${encodeURIComponent(id)}`,{method:'POST',body}),
     addVisuals:(id,body,key)=>call(`/v1/pets/${encodeURIComponent(id)}/visuals`,{method:'POST',body,headers:{'Idempotency-Key':key}}),
+    reviewObservation:(id,body)=>call('/v1/pets/'+encodeURIComponent(id)+'/observations/analyze',{method:'POST',body}),
     draftIntake:body=>call('/v1/intake/analyze',{method:'POST',body}),
     commitIntake:(body,key)=>call('/v1/intake/commit',{method:'POST',body,headers:{'Idempotency-Key':key}}),
     async intake(id){const data=await call(`/v1/pets/${encodeURIComponent(id)}/intake`);await Promise.all([...(data.visuals||[]),...(data.documents||[])].map(async v=>v.url=await visual(v.url)));return data;},

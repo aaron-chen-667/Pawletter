@@ -255,6 +255,7 @@ ${composerView()}
  function markEdited(field){if(!s.review.edited.includes(field))s.review.edited.push(field);}
  // The AI reply acknowledges what was newly understood, then asks about the next missing dimension.
  function replyFor(prior,r){
+  if(r.reply)return [r.reply,r.nextQuestion].filter(Boolean).join('\n');
   const before=prior?.coverage||{},f=r.fields;
   const said=Object.keys(dimensionLabels).filter(d=>r.coverage[d]==='covered'&&before[d]!=='covered').map(d=>d==='species'?speciesLabels[f.species]:d==='sex'?sexLabels[f.sex]:d==='age'&&f.age?f.age:dimensionLabels[d]);
   const ack=said.length?`记下了：${said.join('、')}。`:'';
@@ -270,7 +271,7 @@ ${composerView()}
   const d=saving.text.trim()||images.length?await api.draftIntake({text:saving.text,images,confirmedFields,latestText,...(saving.declined.length?{declined:saving.declined}:{})}):{};
   if(!active||epoch!==ticket||s!==saving)return false;
   const corrected=new Set((d.corrections||[]).map(c=>c.field));
-  saving.review={basis:basisOf(saving),text:saving.text,fields:{name:d.name||'',species:d.species||'unknown',sex:d.sex||'unknown',age:d.age||'',description:d.description||'',character:d.character||''},edited:prior?prior.edited.filter(field=>!corrected.has(field)):[],uncertainties:d.uncertainties||[],nextQuestion:d.nextQuestion||'',nextDimension:d.nextDimension||'',coverage:d.coverage||{},ocrText:d.ocrText||''};
+  saving.review={basis:basisOf(saving),text:saving.text,fields:{name:d.name||'',species:d.species||'unknown',sex:d.sex||'unknown',age:d.age||'',description:d.description||'',character:d.character||''},edited:prior?prior.edited.filter(field=>!corrected.has(field)):[],reply:d.reply||'',uncertainties:d.uncertainties||[],nextQuestion:d.nextQuestion||'',nextDimension:d.nextDimension||'',coverage:d.coverage||{},ocrText:d.ocrText||''};
   for(const field of saving.review.edited)if(field in prior.fields)saving.review.fields[field]=prior.fields[field];
   // Items the rescuer already edited stay as written; newly organised sentences are added after them.
   // Sentences the organiser produced before are remembered, so a rescuer's rewrite or deletion is not undone.

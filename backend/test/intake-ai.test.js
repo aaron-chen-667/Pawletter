@@ -50,3 +50,14 @@ test('legacy model replies without coverage still list every dimension as missin
  const legacy=await provider(draft()).ai.draftIntake({text:'橘色短毛猫。',images:[]});
  assert.equal(legacy.nextDimension,'');assert.equal(legacy.coverage.species,'covered');assert.equal(legacy.coverage.health,'missing');assert.equal(Object.keys(legacy.coverage).length,8);
 });
+
+
+test('intake acknowledgement and daily multimodal conversation come from the provider',async()=>{
+ const intake=provider(draft({reply:'知道了，它是慢热的小猫。'}));
+ assert.equal((await intake.ai.draftIntake({text:'平时慢热。',images:[]})).reply,'知道了，它是慢热的小猫。');
+ const daily=provider({reply:'先按今天的单次观察记录。',nextQuestion:'今天有没有其他变化？'}),image='data:image/jpeg;base64,/9j/';
+ const result=await daily.ai.reviewObservation({pet:{name:'橘子'},notes:[],text:'今天不太吃饭。',history:[{text:'昨天还正常。',question:''}],images:[{kind:'photo',dataUrl:image}]});
+ assert.equal(result.nextQuestion,'今天有没有其他变化？');
+ const content=daily.request.messages[1].content;assert.equal(content[1].image_url.url,image);assert.equal(JSON.parse(content[0].text).history[0].text,'昨天还正常。');
+ await assert.rejects(()=>provider({reply:'',invented:true}).ai.reviewObservation({images:[]}),e=>e.code==='AI_INVALID_RESPONSE');
+});

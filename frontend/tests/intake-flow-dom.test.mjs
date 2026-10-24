@@ -336,3 +336,11 @@ test('public content over the profile limit cannot be archived until shortened',
  h.root.querySelector('.intake-item [data-intake=item-local]').click();await h.until(()=>!h.q('.intake-card-left.over'));
  assert.equal(h.q('#intake-confirm button').disabled,false);
 });
+
+
+test('intake renders the server acknowledgement followed by its validated next question',async t=>{
+ const h=await harness(t,{draftIntake:async()=>draft({reply:'我了解了，它慢热但熟悉后亲人。',nextQuestion:'平时喜欢玩什么？'})});
+ h.type('平时慢热，熟悉以后会亲近人。');h.click('[data-intake=send]');await h.until(()=>h.calls.draft.length===1&&!h.ui.busy);
+ assert.ok(h.bubbles('ai').some(text=>text.includes('我了解了，它慢热但熟悉后亲人。')&&text.includes('平时喜欢玩什么？')));
+ assert.equal(h.calls.commit.length,0);
+});

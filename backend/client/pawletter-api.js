@@ -19,6 +19,8 @@ export function createPawletterClient(baseUrl, fetcher=fetch) {
     applications:()=>call('/v1/applications'),
     applicationStage:(id,stage,version)=>call(`/v1/applications/${encodeURIComponent(id)}/stage`,{method:'POST',body:{stage,version}}),
     async uploadAudio(petId,blob){return call(`/v1/pets/${encodeURIComponent(petId)}/audio`,{method:'POST',body:blob,headers:{'Content-Type':blob.type.split(';')[0]}});},
+    draftIntake:body=>call('/v1/intake/analyze',{method:'POST',body}),
+    reviewObservation:(petId,body)=>call(`/v1/pets/${encodeURIComponent(petId)}/observations/analyze`,{method:'POST',body}),
     submitObservation:(petId,body,idempotencyKey)=>call(`/v1/pets/${encodeURIComponent(petId)}/observations`,{method:'POST',body,headers:{'Idempotency-Key':idempotencyKey}}),
     processObservation:id=>call(`/v1/observations/${encodeURIComponent(id)}/process`,{method:'POST'}),
     observations:petId=>call(`/v1/pets/${encodeURIComponent(petId)}/observations`),

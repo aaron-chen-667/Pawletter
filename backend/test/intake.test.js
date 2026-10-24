@@ -118,3 +118,28 @@ test('guided coverage reopens a declined dimension once the rescuer answers it',
  const analyzed=await request(station,'POST','/v1/intake/analyze',{text:'健康不清楚。\n后来想起来打过疫苗。',images:[],declined:['health','sex']});
  assert.equal(analyzed.statusCode,200,analyzed.body);assert.equal(analyzed.json().coverage.health,'covered');assert.equal(analyzed.json().coverage.sex,'unknown');
 });
+
+
+test('daily Agent analysis is owner-only, uses active notes and never writes records before confirmation',async()=>{
+ const petId=randomUUID(),obs=randomUUID(),withdrawn=randomUUID();
+ await db.query('INSERT INTO pets(id,station_id,name,profile) VALUES($1,$2,$3,$4)',[petId,'s1','分析测试伙伴',JSON.stringify({species:'cat'})]);
+ for(const [id,status,quote]of [[obs,'archived','疫苗时间不清楚。'],[withdrawn,'withdrawn','已撤回的信息。']]){
+  await db.query('INSERT INTO observations(id,pet_id,author_id,idempotency_key,request_hash,original_text,status) VALUES($1,$2,(SELECT id FROM users WHERE username=$3),$4,$5,$6,$7)',[id,petId,'intake-one',id,'hash',quote,status]);
+  await db.query('INSERT INTO knowledge(id,observation_id,pet_id,topic,quote,certainty) VALUES($1,$2,$3,$4,$5,$6)',[randomUUID(),id,petId,'health',quote,'pending']);
+ }
+ let seen,calls=0;ai.reviewObservation=async body=>{seen=body;calls++;return {reply:'先保留为本次观察。',nextQuestion:'这是今天观察到的吗？'};};
+ const url='/v1/pets/'+petId+'/observations/analyze',body={text:'今天吃得少。',images:[],history:[{text:'最近食欲变化。',question:'什么时候观察到的？'}],observedOn:'2026-10-24'};
+ assert.equal((await request(adopter,'POST',url,body)).statusCode,403);
+ assert.equal((await request(other,'POST',url,body)).statusCode,403);
+ assert.equal((await app.inject({method:'POST',url,payload:body})).statusCode,401);
+ assert.equal(calls,0);
+ const response=await request(station,'POST',url,body);assert.equal(response.statusCode,200,response.body);assert.match(response.json().reply,/本次观察/);
+ assert.equal(seen.pet.name,'分析测试伙伴');assert.deepEqual(seen.history,body.history);assert.equal(seen.notes.length,1);assert.equal(seen.notes[0].certainty,'pending');assert.equal(seen.notes[0].quote,'疫苗时间不清楚。');
+ assert.equal((await db.query('SELECT * FROM observations WHERE pet_id=$1',[petId])).rows.length,2);
+ assert.equal((await request(station,'POST',url,{...body,images:[{kind:'photo',dataUrl:'data:image/jpeg;base64,AAAA'}]})).statusCode,400);
+ assert.equal(calls,1);
+ const jpeg='data:image/jpeg;base64,'+Buffer.concat([Buffer.from([255,216]),Buffer.alloc(30)]).toString('base64');
+ assert.equal((await request(station,'POST',url,{...body,text:'',images:[{kind:'video',dataUrl:jpeg}],replacesId:obs})).statusCode,200);assert.equal(seen.images[0].kind,'video');assert.equal(seen.original.original_text,'疫苗时间不清楚。');
+ assert.equal((await request(station,'POST',url,{...body,replacesId:withdrawn})).statusCode,409);
+ ai.reviewObservation=async()=>({reply:42});const invalid=await request(station,'POST',url,body);assert.equal(invalid.statusCode,502);assert.equal(invalid.json().error,'AI_INVALID_RESPONSE');
+});

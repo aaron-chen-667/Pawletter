@@ -50,6 +50,7 @@ export function createStationExamples(storage=globalThis.sessionStorage){
   agent:async id=>({voice:copy(state.voices[id]||{tone:'shy',style:'轻声短句，慢慢熟悉。'})}),updateAgent:async(id,voice)=>{state.voices[id]=copy(voice);save();return {voice};},
   chat:async(id,question)=>{const shared=state.records.filter(r=>r.pet_id===id&&r.status==='archived'&&r.share_with_agent).flatMap(notes);const terms=/健康|吃|粮|便|食欲/.test(question)?/健康|吃|粮|便|食欲/:/喜欢|玩|靠近|互动/;const found=shared.filter(n=>terms.test(n.quote)).slice(0,2);return {answer:found.length?'照顾我的人记下了：'+found.map(n=>n.quote).join(' ')+'（预设示例回答）':'这件事还没有记进我的有效档案，我暂时不知道。（预设示例回答）',citations:found};},
   // This deterministic preview is explicitly labelled as an example, never a real AI response.
+  reviewObservation:async()=>({reply:'预设示例：这条补充已放在草稿里，确认后再入档。',nextQuestion:''}),
   draftIntake:async body=>{
    const lines=body.text.split('\n').map(t=>t.replace(/^救助者口述：/,''));
    const text=lines.join('；'),ageMatch=text.match(/(?:大概|约|估计)([一二三四五六七八九十两0-9]+)岁/),skipped=text.includes('不清楚');

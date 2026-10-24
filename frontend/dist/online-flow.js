@@ -27,5 +27,6 @@ export const errorMessage=e=>({
   KNOWLEDGE_CHANGED_RETRY:'资料刚刚更新了，请重新发送问题。',PET_NOT_FOUND:'这只宠物暂时不可查看，请刷新列表。',AI_UNAVAILABLE:'Agent 暂时没有回应，请稍后重试。',AI_PROVIDER_ERROR:'Agent 暂时无法回答，请稍后重试。',
   OBSERVATION_NOT_ACTIVE:'这条记录已被更正或撤回，请刷新。',OBSERVATION_NOT_FAILED:'这条记录已经在处理中，请刷新进度。',INVALID_INPUT:'请检查输入内容。',EMPTY_OBSERVATION:'先说一段语音，或写下你的观察。',
   EXAMPLE_STORAGE_FULL:'示例存储空间不足，请减少附件后重试。',
+  AI_RATE_LIMITED:'Agent 当前繁忙，草稿已保留，请稍后重试。',AI_INVALID_RESPONSE:'Agent 未返回完整解析，草稿已保留，请重试。',
   INVALID_RESPONSE:'服务暂时没有返回有效结果，请稍后重试。'
 }[e?.message]||'暂时连接不上，请检查网络后重试；已提交的记录可刷新查看。');

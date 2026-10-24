@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {authenticate,canReadStation,digest} from './auth.js';
 import {transaction} from './db.js';
 import {assert} from './errors.js';
+import {validateObservationReview} from './observation-review.js';
 import {petProfileSchema,defaultVoice} from './pet-agent.js';
 import {reserveBudget} from './onboarding.js';
 const intakeProfileFields={name:z.string().max(80),species:z.enum(['cat','dog','unknown']),description:z.string().max(4000),character:z.string().max(500),age:z.string().max(80),sex:z.enum(['male','female','unknown'])};
@@ -11,7 +12,7 @@ const confirmedFieldsSchema=z.object(intakeProfileFields).partial().strict();
 // Guided intake dimensions: the profile fields the agent speaks from, then the knowledge topics it cites, in asking order.
 export const intakeDimensions=['species','age','sex','health','character','likes','habits','diet'];
 const dimension=z.enum(intakeDimensions),coverageSchema=z.object(Object.fromEntries(intakeDimensions.map(d=>[d,z.enum(['covered','unknown','missing'])]))).partial().strict();
-export const intakeDraftSchema=z.object({...intakeProfileFields,ocrText:z.string().max(6000),nextQuestion:z.string().max(200).default(''),nextDimension:z.union([dimension,z.literal('')]).default(''),coverage:coverageSchema.default({}),uncertainties:z.array(z.string().max(160)).max(10),corrections:z.array(correctionSchema).max(6).default([])}).strict();
+export const intakeDraftSchema=z.object({...intakeProfileFields,ocrText:z.string().max(6000),reply:z.string().max(800).default(''),nextQuestion:z.string().max(200).default(''),nextDimension:z.union([dimension,z.literal('')]).default(''),coverage:coverageSchema.default({}),uncertainties:z.array(z.string().max(160)).max(10),corrections:z.array(correctionSchema).max(6).default([])}).strict();
 export function validateIntakeDraft(value,{confirmedFields={},latestText='',declined=[]}={}){
  const confirmed=confirmedFieldsSchema.parse(confirmedFields),draft=intakeDraftSchema.parse({...value,corrections:[]}),corrected=new Set();
  // Every dimension gets a status; a skipped one is never asked again unless the rescuer later answers it.
@@ -56,7 +57,22 @@ export async function intakeRoutes(app,{db,ai,storage,origin}){
   assert(body.text||body.images.length,400,'EMPTY_INTAKE');body.images.forEach(i=>decode(i.dataUrl));await reserveBudget(db,'intake',10,200);
   return validateIntakeDraft(await ai.draftIntake(body),body);
  });
- app.post('/v1/intake/commit',{preHandler:staff,bodyLimit:20*1024*1024},async(req,reply)=>{
+ // Owner-only conversational analysis: no observations, knowledge, or media are written here.
+ app.post('/v1/pets/:id/observations/analyze',{preHandler:staff,bodyLimit:8*1024*1024,config:{rateLimit:{max:12,timeWindow:'1 minute'}}},async req=>{
+  const pet=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];
+  assert(pet&&pet.station_id===req.user.station_id,403,'STATION_REQUIRED');
+  const turn=z.object({text:z.string().max(12000),observedOn:z.iso.date().optional(),question:z.string().max(200).default('')}).strict();
+  const body=z.object({text:z.string().trim().max(12000),observedOn:z.iso.date().optional(),images:z.array(z.object({kind:z.enum(['photo','video']),dataUrl:jpegImage}).strict()).max(5),history:z.array(turn).max(6).default([]),replacesId:z.string().uuid().optional()}).strict().parse(req.body);
+  assert(body.text||body.images.length,400,'EMPTY_OBSERVATION');
+  assert(body.text.length+body.history.reduce((n,h)=>n+h.text.length+h.question.length,0)<=24000,400,'INVALID_INPUT');
+  body.images.forEach(i=>decode(i.dataUrl));
+  let original;
+  if(body.replacesId){original=(await db.query("SELECT original_text,transcript,observed_on FROM observations WHERE id=$1 AND pet_id=$2 AND status='archived'",[body.replacesId,pet.id])).rows[0];assert(original,409,'OBSERVATION_NOT_ACTIVE');}
+  const notes=(await db.query("SELECT k.topic,k.quote,k.certainty,o.observed_on FROM knowledge k JOIN observations o ON o.id=k.observation_id WHERE k.pet_id=$1 AND o.status='archived' ORDER BY o.created_at DESC,k.id LIMIT 30",[pet.id])).rows;
+  await reserveBudget(db,'observation-review',30,400);
+  return validateObservationReview(await ai.reviewObservation({...body,pet:{name:pet.name,profile:pet.profile},notes,original:original||null}));
+ });
+ app.post('/v1/intake/commit' ,{preHandler:staff,bodyLimit:20*1024*1024},async(req,reply)=>{
   const body=z.object({name:z.string().trim().min(1).max(80),profile:petProfileSchema,published:z.boolean(),text:z.string().max(12000),ocrText:z.string().max(6000),photos:z.array(jpegImage).max(3),video:z.string().max(14500000).optional(),documents:z.array(document).max(3).optional(),simple:z.boolean().optional(),notes:z.array(reviewedNote).max(80).optional()}).strict().parse(req.body);
   assert(!body.simple||body.text.length<=4000,400,'INVALID_INPUT');
   const key=z.string().uuid().parse(req.headers['idempotency-key']),hash=digest(JSON.stringify(body));

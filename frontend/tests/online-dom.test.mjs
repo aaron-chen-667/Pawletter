@@ -12,6 +12,7 @@ test('online UI logs in with server role, records to correct pet, preserves corr
    if(path.endsWith('/login'))data={token:'memory-only-token',user:{id:'user',role,stationId:role==='station'?'station-1':null},expiresAt:'2099-01-01'};
    else if(path==='/v1/stations')data={stations:[{id:'station-1',name:'本站'}]};
    else if(path==='/v1/applications')data={applications:[]};else if(path==='/v1/pets')data={pets:[p]};
+   else if(path.endsWith('/observations/analyze'))data={reply:'今天的观察已放入草稿，确认后入档。',nextQuestion:''};
    else if(path.endsWith('/knowledge'))data={notes:rows.length?[{id:'note',quote:'今天不愿被抱。',topic:'likes',certainty:'observation',station:'本站',recorded_at:'2026-10-21'}]:[]};
    else if(path.endsWith('/observations')&&options.method==='POST'){rows=[{id:'obs',original_text:body.text,share_with_agent:body.shareWithAgent,status:'archived',created_at:'2026-10-21'}];data={id:'obs'};}
    else if(path.endsWith('/observations'))data={observations:rows};
@@ -29,7 +30,7 @@ test('online UI logs in with server role, records to correct pet, preserves corr
   assert.match(q('#app').textContent,/救助站工作台/);
   click('[data-live=voice]');await waitFor(()=>q('[data-daily=pick]'));click('[data-daily=pick]');await waitFor(()=>q('[data-daily=mode]'));click('[data-daily=mode]');await waitFor(()=>q('#daily-text'));
   fill('#daily-text','今天不愿被抱。');click('[data-daily=local]');
-  click('[data-daily=review]');assert.equal(calls.filter(c=>c.path.endsWith('/observations')&&c.body).length,0);click('[data-daily=save]');await waitFor(()=>q('[data-live=correct]')&&!q('[data-live=correct]').disabled);
+  click('[data-daily=review]');await waitFor(()=>q('[data-daily=save]'));assert.equal(calls.filter(c=>c.path.endsWith('/observations')&&c.body).length,0);click('[data-daily=save]');await waitFor(()=>q('[data-live=correct]')&&!q('[data-live=correct]').disabled);
   const observation=calls.find(c=>c.path.endsWith('/observations')&&c.body);assert.equal(observation.body.text,'今天不愿被抱。');assert.equal(observation.body.shareWithAgent,false);assert.ok(observation.headers['Idempotency-Key']);
   click('[data-live=correct]');await waitFor(()=>q('#daily-text')?.value==='今天不愿被抱。');assert.match(q('.daily-original').textContent,/今天不愿被抱/);
   click('[data-live=home]');await waitFor(()=>q('[data-live=pets]'));assert.equal(q('[data-live=pet]'),null);click('[data-live=pets]');await waitFor(()=>q('[data-live=pet]'));click('[data-live=pet]');await waitFor(()=>q('[data-live=chat]'));

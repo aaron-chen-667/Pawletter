@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
  created_at timestamptz NOT NULL DEFAULT now(),
  CHECK ((role='station' AND station_id IS NOT NULL) OR (role='adopter' AND station_id IS NULL))
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS read_all_stations boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS sessions (
  token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id),
  expires_at timestamptz NOT NULL

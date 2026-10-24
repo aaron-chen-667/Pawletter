@@ -36,6 +36,12 @@ npm start
 
 管理员通过 `npm run provision` 的标准输入传入一个 JSON 对象：`username`、`password`（12–128 字符）、`role`（station/adopter）；站点账号还需 `stationId`、`stationName`。运行位置必须能连接数据库。密码不得放入命令行参数、代码、构建配置或日志；脚本仅返回用户 ID，不开放在线自助提权入口。
 
+开发账号可由管理员授予跨站只读权限：先迁移新增 `users.read_all_stations` 列，再部署 API；在能连接数据库的受控环境中运行 `node scripts/set-station-read-access.js`，标准输入传入 `{"username":"gordon.station","enabled":true}`。传 `false` 撤销。变更与审计同事务，现有会话从下一次请求起采用新权限。回滚旧 API 时保留新增列。
+
+该权限只适用于有效的 station 账号，读取所有现有及后续新增站点的宠物、私有档案、影像、申请和回访；`GET /v1/stations` 提供包含空站的列表。账号归属和所有业务写入仍限原站点，别站未公开宠物的聊天不开放。普通救助站和领养者默认无跨站权限。前端的“全部救助站”及筛选使用此服务端权限，`examples=1` 仍是独立浏览器示例。
+
+`FRONTEND_ORIGIN` 支持英文逗号分隔的完整 Origin，CORS 与匿名接口使用同一份精确白名单；不接受路径、凭据、查询参数或通配符。
+
 ## 上下游调用
 
 1. 通过 `/v1/auth/login` 登录，取得有效期 8 小时的 Bearer 会话。站点身份以账号数据库记录为准，不能接受前端角色切换充当授权。

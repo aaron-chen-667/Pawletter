@@ -8,6 +8,7 @@ test('station entry rejects adopter account and only opens workspace after stati
  globalThis.fetch=async(url)=>{
   if(url.endsWith('/login'))return Response.json({token:'test-token',user:{id:'u',role,stationId:role==='station'?'s':null}});
   if(url.endsWith('/logout')){loggedOut++;return Response.json({ok:true});}
+  if(url.endsWith('/stations'))return Response.json({stations:[{id:'s',name:'本站'}]});
   if(url.endsWith('/pets')){petReads++;return Response.json({pets:[]});}
   if(url.endsWith('/applications'))return Response.json({applications:[]});if(url.endsWith('/followups'))return Response.json({followups:[]});throw Error('Unexpected endpoint');
  };

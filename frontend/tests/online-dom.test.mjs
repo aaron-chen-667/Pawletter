@@ -5,11 +5,12 @@ test('online UI logs in with server role, records to correct pet, preserves corr
  const dom=new JSDOM('<div id="app"></div>',{url:'https://pawletter.invalid/?mode=online'});
  for(const [name,value] of Object.entries({window:dom.window,document:dom.window.document,location:dom.window.location,navigator:dom.window.navigator,FormData:dom.window.FormData,confirm:()=>true}))Object.defineProperty(globalThis,name,{value,configurable:true,writable:true});
  const originalFetch=globalThis.fetch,calls=[];let role='station',failChat=false,rows=[];
- const p={id:'pet-1',name:'吐司',stationId:'station-1',profile:{species:'cat',description:'喜欢安静'}};
+ const p={id:'pet-1',name:'吐司',stationId:'station-1',published:true,profile:{species:'cat',description:'喜欢安静'}};
  globalThis.fetch=async(url,options)=>{
    const path=new URL(url).pathname,body=options.body?JSON.parse(options.body):undefined;calls.push({path,body,headers:options.headers});
    let data={};let status=200;
    if(path.endsWith('/login'))data={token:'memory-only-token',user:{id:'user',role,stationId:role==='station'?'station-1':null},expiresAt:'2099-01-01'};
+   else if(path==='/v1/stations')data={stations:[{id:'station-1',name:'本站'}]};
    else if(path==='/v1/applications')data={applications:[]};else if(path==='/v1/pets')data={pets:[p]};
    else if(path.endsWith('/knowledge'))data={notes:rows.length?[{id:'note',quote:'今天不愿被抱。',topic:'likes',certainty:'observation',station:'本站',recorded_at:'2026-10-21'}]:[]};
    else if(path.endsWith('/observations')&&options.method==='POST'){rows=[{id:'obs',original_text:body.text,share_with_agent:body.shareWithAgent,status:'archived',created_at:'2026-10-21'}];data={id:'obs'};}

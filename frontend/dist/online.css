@@ -46,3 +46,5 @@
 
 
 .pet-visibility{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0 8px;border-top:1px solid var(--line);margin-top:18px}.pet-visibility strong{font-size:15px}.pet-visibility small{display:block;color:#78839a;font-size:12px;margin-top:6px;line-height:1.5}.visibility-switch{width:54px;height:32px;border:0;border-radius:20px;flex-shrink:0;padding:4px;background:#ced4e0;cursor:pointer;box-sizing:content-box;min-height:32px}.visibility-switch span{display:block;width:24px;height:24px;background:white;border-radius:50%;box-shadow:0 1px 3px #0002;transition:transform .18s}.visibility-switch[aria-checked=true]{background:#5960d9}.visibility-switch[aria-checked=true] span{transform:translateX(30px)}.online-app .visibility-note{font-size:11px;line-height:1.6;color:#7d879b;margin:6px 0 15px}.visibility-switch:disabled{opacity:.55;cursor:wait}
+
+.station-scope{margin-bottom:16px}.application-pair>span{min-width:0;max-width:100%}.pair-pet-name{display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}.pair-pet-name small{font-size:11px;color:#77839a}

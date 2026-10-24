@@ -15,6 +15,7 @@ export function createStationExamples(storage=globalThis.sessionStorage){
  const note=r=>({id:r.id,observation_id:r.id,topic:r.topic||(/吃|粮|便|食欲/.test(r.original_text)?'health':'likes'),certainty:r.certainty||'observation',quote:r.original_text,station:'暖爪救助站 · 示例',recorded_at:r.created_at});
  const api={
   user:()=>copy(state.user),reset(empty=false){state=stationFixture();if(empty){state.pets=[];state.records=[];state.applications=[];state.followups=[];}save();},
+  stations:async()=>({stations:[{id:state.user.stationId,name:'暖爪救助站 · 示例'}]}),
   login:async()=>({user:copy(state.user)}),logout:async()=>{},me:async()=>copy(state.user),pets:async()=>({pets:copy(state.pets)}),applications:async()=>({applications:copy(state.applications)}),
   applicationStage:async(id,stage,version)=>{const a=state.applications.find(a=>a.id===id);if(!a||a.version!==version)throw Error('INVALID_INPUT');if(stage===3&&a.snapshot.verification!=='verified')throw Error('INVALID_INPUT');Object.assign(a,{stage,version:version+1});save();return copy(a);},
   setVisibility:async(id,published)=>{const p=state.pets.find(p=>p.id===id);if(!p||p.stationId!==state.user.stationId)throw Error('STATION_REQUIRED');p.published=published;save();return {ok:true};},

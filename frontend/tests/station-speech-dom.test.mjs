@@ -11,6 +11,7 @@ test('station network failure keeps playback and retry, then requires confirmati
   if(String(url).startsWith('blob:'))return originalFetch(url,options);
   const path=new URL(url).pathname;
   if(path.endsWith('/login'))return Response.json({token:'test',user:{role:'station',stationId:'s1'}});
+  if(path==='/v1/stations')return Response.json({stations:[{id:'s1',name:'本站'}]});
   if(path==='/v1/pets')return Response.json({pets:[p]});
   if(path==='/v1/applications')return Response.json({applications:[]});
   if(path==='/v1/followups')return Response.json({followups:[]});

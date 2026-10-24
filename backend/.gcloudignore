@@ -5,6 +5,8 @@
 !src/**
 !scripts/
 !scripts/**
+!fixtures/
+!fixtures/**
 !Dockerfile
 !.dockerignore
 !cloudbuild.yaml

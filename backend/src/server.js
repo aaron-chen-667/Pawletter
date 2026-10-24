@@ -13,7 +13,7 @@ const workerAuth = async request => {
     return payload?.email === email && payload.email_verified === true && ['accounts.google.com','https://accounts.google.com'].includes(payload.iss);
   } catch { return false; }
 };
-const app = await createApp({db,ai:createAI(),storage:createStorage(),workerAuth,origin:process.env.FRONTEND_ORIGIN,logger:{level:'info',redact:['req.headers.authorization','req.body','res.headers']}});
+const app = await createApp({db,ai:createAI(),storage:createStorage(),workerAuth,origin:process.env.FRONTEND_ORIGIN,additionalOrigins:process.env.FRONTEND_ADDITIONAL_ORIGINS,logger:{level:'info',redact:['req.headers.authorization','req.body','res.headers']}});
 let stopping = false;
 const shutdown = async()=>{if(stopping)return;stopping=true;await app.close();await db.end();};
 process.on('SIGTERM',()=>shutdown().catch(()=>process.exit(1)));

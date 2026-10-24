@@ -5,3 +5,5 @@
 !src/**
 !scripts/
 !scripts/**
+!fixtures/
+!fixtures/**

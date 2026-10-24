@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
 import {migrate} from '../src/db.js';
 import {seedPublicExamples} from '../scripts/seed-public-examples.js';
+import {clarifyExampleCare} from '../scripts/clarify-example-care.js';
 import {createApp} from '../src/app.js';
 test('public examples are persisted archives; replay preserves edits, privacy and withdrawals',async()=>{
  const engine=new PGlite(),query=(sql,params)=>sql.includes('CREATE TABLE')?engine.exec(sql):engine.query(sql,params),db={query,connect:async()=>({query,release(){}})};
@@ -22,5 +23,11 @@ test('public examples are persisted archives; replay preserves edits, privacy an
   assert.equal((await query('SELECT name,published FROM pets WHERE id=$1',[catalog[0].id])).rows[0].name,'人工修改');
   assert.equal((await app.inject('/v1/catalog')).json().pets.length,16);
   assert.equal((await query("SELECT * FROM observations WHERE status='withdrawn'")).rows.length,3);
+  const label='对未来领养家庭的照护要求（不是宠物已经具备的能力或已经发生的行为）：';
+  await query("UPDATE observations SET original_text=replace(original_text,$1,''),transcript=replace(transcript,$1,'') WHERE id LIKE '%-archive-2'",[label]);
+  assert.deepEqual(await clarifyExampleCare(db),{corrected:16});
+  assert.deepEqual(await clarifyExampleCare(db),{corrected:0});
+  assert.equal((await query("SELECT * FROM observations WHERE replaces_id IS NOT NULL AND status='archived'")).rows.length,16);
+  assert.equal((await query("SELECT * FROM observations WHERE status='withdrawn'")).rows.length,19);
  }finally{await app?.close();await engine.close();}
 });

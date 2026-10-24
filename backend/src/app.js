@@ -180,6 +180,19 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     WHERE k.pet_id=$1 AND o.status='archived' AND (o.share_with_agent=true OR $2::boolean=true)
     ORDER BY CASE WHEN $3::text[] IS NULL THEN 0 WHEN k.topic=ANY($3::text[]) OR k.quote ~ $4::text THEN 0 ELSE 1 END,
       o.created_at DESC,k.id LIMIT 100`,[petId,includePrivate,topics,topics?.map(topic=>topicWords[topic]).filter(Boolean).join('|')||'(?!)'])).rows;}
+  // Public profiles use the same active, shareable archives as the pet agent.
+  // Visibility and notes are read in one statement; raw observations stay private.
+  app.get('/v1/catalog/:id/facts',async(req,reply)=>{
+    const row=(await db.query(`SELECT p.id,COALESCE((SELECT jsonb_agg(n) FROM (
+      SELECT k.id,k.quote,k.topic,k.certainty,o.created_at AS recorded_at
+      FROM knowledge k JOIN observations o ON o.id=k.observation_id
+      WHERE k.pet_id=p.id AND o.pet_id=p.id AND o.status='archived' AND o.share_with_agent=true
+      ORDER BY o.created_at DESC,k.id LIMIT 100
+    ) n),'[]'::jsonb) AS notes FROM pets p
+    WHERE p.id=$1 AND p.published=true AND COALESCE((p.profile->>'internal')::boolean,false)=false
+      AND p.name NOT LIKE '联调·%'`,[req.params.id])).rows[0];
+    assert(row,404,'PET_NOT_FOUND');reply.header('Cache-Control','no-store');return row;
+  });
   app.get('/v1/pets/:id/knowledge',{preHandler:auth},async req=>{const pet=await petFor(req.user,req.params.id);return {notes:await notesFor(pet.id,req.user.station_id===pet.station_id)};});
   app.get('/v1/pets/:id/chat',{preHandler:auth},async req=>{
     const pet=await petFor(req.user,req.params.id);

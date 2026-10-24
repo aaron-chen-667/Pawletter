@@ -46,7 +46,7 @@ test('intake completion blocks logout until its delayed list response opens the 
   }
   throw Error('Unexpected request: '+path);
  };
- for(const [key,value]of Object.entries({window:w,document:w.document,navigator:w.navigator,location:w.location,FormData:w.FormData,confirm:()=>true,indexedDB:database,fetch:fetcher})){
+ for(const [key,value]of Object.entries({window:w,document:w.document,navigator:w.navigator,location:w.location,FormData:w.FormData,confirm:()=>true,indexedDB:database,fetch:fetcher,localStorage:{getItem:key=>key==='pawletter.intake.input-mode'?'text':null,setItem(){}}})){
   previous.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true});
  }
  t.after(()=>{dom.window.close();for(const [key,descriptor]of previous){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}});
@@ -61,8 +61,8 @@ test('intake completion blocks logout until its delayed list response opens the 
  await login('a');click('[data-live=new]');await until(()=>q('#intake-answer'));
  set('#intake-answer','本站新接收的一只动物，左耳有缺口。');
  assert.equal(calls.filter(c=>c.path==='/v1/intake/analyze').length,0);
- submit('#intake-confirm');await until(()=>q('.intake-review')&&!q('#intake-confirm button').disabled);
- assert.equal(calls.filter(c=>c.path==='/v1/intake/commit').length,0,'The first confirmation only organises the record');
+ click('[data-intake=send]');await until(()=>q('#intake-confirm')&&!q('#intake-confirm button').disabled);
+ assert.equal(calls.filter(c=>c.path==='/v1/intake/commit').length,0,'Sending a message only organises the record');
  submit('#intake-confirm');await until(()=>resolveList);
  const saved=calls.find(c=>c.path==='/v1/intake/commit');
  assert.deepEqual(saved.body.photos,[]);assert.equal(saved.body.profile.species,'unknown');assert.equal(saved.body.published,false);
@@ -81,6 +81,6 @@ test('intake completion blocks logout until its delayed list response opens the 
  await login('b');click('[data-live=pets]');await until(()=>q(`[data-live=pet][data-id="${petB.id}"]`));
  assert.doesNotMatch(q('#app').textContent,/A站新伙伴|A站尚未公开/);assert.ok(q('#app').textContent.includes(petB.name));
  click('[data-live=new]');await until(()=>q('#intake-answer'));
- assert.equal(q('#intake-answer').value,'');assert.equal(q('#intake-confirm button').disabled,true);assert.doesNotMatch(q('#app').textContent,/A站新伙伴|A站尚未公开/);
+ assert.equal(q('#intake-answer').value,'');assert.equal(q('#intake-confirm'),null,'A new conversation has nothing to archive');assert.doesNotMatch(q('#app').textContent,/A站新伙伴|A站尚未公开/);
  assert.equal(calls.filter(c=>c.authorization==='Bearer b'&&c.path.includes(petA.id)).length,0);
 });

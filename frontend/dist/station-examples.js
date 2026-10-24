@@ -1,4 +1,5 @@
 import {createAdopterExamples,exampleAnalysis,exampleAnswers} from './adopter-examples.js';
+import {topicOf} from './pet-knowledge.js';
 export const STATION_EXAMPLES_KEY='pawletter.station.examples.v13';
 export const stationScenes=[['home','工作台','今日申请与宠物日常'],['empty','首次进入','录入第一位伙伴'],['new','录入新伙伴','添加素材，记录情况，确认入档'],['voice','补充日常','按住说，核对转录后归档'],['pet','长期档案','照片、习惯与健康观察'],['agent','分身表达','只调整口吻，不编写事实'],['chat','分身问答','根据有效资料回答'],['applications','领养申请','待审核、见面、交接'],['application','申请详情','生活画像与核验状态'],['failed','整理失败','保留原文，重新整理'],['followups','回访跟踪','安排回访、确认与持续跟进'],['private','私有观察','本站可见，不用于对外回答']];
 export const exampleObservation='吐司平时喜欢玩羽毛逗猫棒。今天换粮后有点软便，还不确定原因。';
@@ -12,7 +13,7 @@ export function stationFixture(){
 export function createStationExamples(storage=globalThis.sessionStorage){
  let state=stationFixture();try{const old=JSON.parse(storage?.getItem(STATION_EXAMPLES_KEY));if(old?.version===2)state=old;}catch{}
  const copy=v=>structuredClone(v),save=()=>{try{storage?.setItem(STATION_EXAMPLES_KEY,JSON.stringify(state));}catch{}},row=id=>{const r=state.records.find(r=>r.id===id);if(!r)throw Error('OBSERVATION_NOT_ACTIVE');return r;};
- const note=(r,quote=r.original_text,i=0)=>({id:i?`${r.id}:${i}`:r.id,observation_id:r.id,topic:r.topic||(/吃|粮|罐头|喝水|食欲/.test(quote)?'diet':/便|伤|病|药|体重|疫苗|驱虫|绝育|检查/.test(quote)?'health':/喜欢|玩/.test(quote)?'likes':/躲|靠近|睡|作息|散步|蹭/.test(quote)?'habits':'other'),certainty:r.certainty||(/可能|不确定|待确认|不清楚/.test(quote)?'pending':/平时|一直|每天|通常|习惯/.test(quote)?'ongoing':'observation'),quote,station:'暖爪救助站 · 示例',recorded_at:r.created_at});
+ const note=(r,quote=r.original_text,i=0)=>({id:i?`${r.id}:${i}`:r.id,observation_id:r.id,topic:r.topic||topicOf(quote),certainty:r.certainty||(/可能|不确定|待确认|不清楚/.test(quote)?'pending':/平时|一直|每天|通常|习惯/.test(quote)?'ongoing':'observation'),quote,station:'暖爪救助站 · 示例',recorded_at:r.created_at});
  // Like the real worker, a new record is split into sentences so each one carries its own topic.
  const notes=r=>r.topic?[note(r)]:r.original_text.split(/(?<=[。！？；\n])/).map(t=>t.trim()).filter(Boolean).map((quote,i)=>note(r,quote,i));
  const api={

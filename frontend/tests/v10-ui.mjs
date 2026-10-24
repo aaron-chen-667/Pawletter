@@ -13,6 +13,7 @@ let applications=[{id:'adoption',petId:'dog',adopterId:'me',name:'小禾',stage:
 await page.route('https://pawletter-api-446222711695.asia-east1.run.app/**',async route=>{
  const url=new URL(route.request().url()),path=url.pathname,method=route.request().method(),body=method==='POST'?route.request().postDataJSON():{};let result={ok:true};
  if(path.endsWith('/catalog')||path==='/v1/pets')result={pets:catalogFixture};
+ else if(path==='/v1/stations')result={stations:[{id:'warm',name:'暖爪救助站'}]};
  else if(path.endsWith('/login'))result={token:'fixture',expiresAt:new Date(Date.now()+60000).toISOString(),user:{id:'staff',role:'station',stationId:'warm'}};
  else if(path.endsWith('/register'))result={token:'fixture',expiresAt:new Date(Date.now()+60000).toISOString(),profile};
  else if(path.endsWith('/adopter/profile'))result=profile;

@@ -4,9 +4,10 @@ const browser=await launchBrowser(),page=await browser.newPage({viewport:{width:
 page.on('pageerror',e=>errors.push(e.message));
 await page.route('https://pawletter-api-446222711695.asia-east1.run.app/**',r=>{requests.push(r.request().url());return r.abort();});
 try{
- await page.goto('http://localhost:4178/?mode=online&role=station&examples=1');await page.locator('[data-live=voice]').click();
- assert.equal(await page.locator('#hold-record').count(),0);assert.match(await page.locator('.voice-composer').textContent(),/预设文字.*不录音.*不上传/);
- await page.locator('[data-live=sample-observation]').click();assert.match(await page.locator('#observation-text').inputValue(),/橘子.*逗猫棒/);assert.equal(await page.locator('#live-error').textContent(),'');
- await page.locator('[data-live=submit-text]').click();await page.locator('#record-panel').waitFor();assert.match(await page.locator('#record-panel').textContent(),/今天换粮后有点软便/);
- assert.deepEqual(requests,[]);assert.deepEqual(errors,[]);console.log(JSON.stringify({exampleAudioUploads:0,explicitPreset:true,confirmArchive:true,errors}));
+ await page.goto(`${process.env.INTAKE_BASE_URL||'http://localhost:4178'}/?mode=online&role=station&examples=1`);await page.locator('.station-action-dock [data-live=voice]').click();
+ await page.locator('[data-daily=pick]').first().click();await page.locator('#daily-record').click();assert.match(await page.locator('#daily-text').inputValue(),/逗猫棒/);
+ await page.locator('[data-daily=panel]').click();await page.locator('[data-daily=sample-photo]').click();await page.locator('.daily-thumb img').waitFor();
+ await page.locator('[data-daily=sheet]').click();await page.locator('[data-daily=day]').nth(1).click();assert.match(await page.locator('.daily-entry header').textContent(),/昨天/);
+ await page.locator('[data-daily=save]').click();await page.locator('.online-card.just-added').waitFor();assert.match(await page.locator('.online-card.just-added').textContent(),/昨天 · 刚追加/);assert.equal(await page.locator('.online-card.just-added .record-visuals img').count(),1);
+ assert.deepEqual(requests,[]);assert.deepEqual(errors,[]);console.log(JSON.stringify({exampleAudioUploads:0,datedWithPhoto:true,errors}));
 }finally{await browser.close();}

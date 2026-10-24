@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
  created_at timestamptz NOT NULL DEFAULT now(),
  CHECK ((role='station' AND station_id IS NOT NULL) OR (role='adopter' AND station_id IS NULL))
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS read_all_stations boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS sessions (
  token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id),
  expires_at timestamptz NOT NULL
@@ -92,3 +93,12 @@ CREATE TABLE IF NOT EXISTS rescue_followups (
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS followup_active ON rescue_followups(application_id) WHERE status<>'completed';
+
+-- Daily records: when the event happened (entry time stays created_at) and the photos or video saved with it.
+ALTER TABLE observations ADD COLUMN IF NOT EXISTS observed_on date;
+ALTER TABLE media ADD COLUMN IF NOT EXISTS observation_id text REFERENCES observations(id);
+
+-- Visual-only supplements are valid content; the API stores their files in the same transaction.
+ALTER TABLE observations ADD COLUMN IF NOT EXISTS has_visuals boolean NOT NULL DEFAULT false;
+ALTER TABLE observations DROP CONSTRAINT IF EXISTS observations_check;
+ALTER TABLE observations ADD CONSTRAINT observations_check CHECK (length(original_text)>0 OR media_id IS NOT NULL OR has_visuals);

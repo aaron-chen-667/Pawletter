@@ -13,4 +13,4 @@ http.createServer(async(req,res)=>{
     const body=await readFile(file);
     res.writeHead(200,{'Content-Type':types[path.extname(file)] || 'application/octet-stream','Cache-Control':'no-cache'}).end(body);
   } catch {res.writeHead(404).end('Not found');}
-}).listen(4178,'0.0.0.0',()=>console.log('Pawletter preview: http://localhost:4178'));
+}).listen(Number(process.env.PORT || 4178),'0.0.0.0',()=>console.log(`Pawletter preview: http://localhost:${process.env.PORT || 4178}`));

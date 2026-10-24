@@ -6,12 +6,16 @@ export const knowledgeTopics=[
   {key:'health',label:'健康观察',pattern:/肠胃|排便|便便|软便|拉肚|腹泻|呕吐|过敏|生病|健康|疫苗|绝育|症状|食欲|精神/},
   {key:'other',label:'其他观察',pattern:null}
 ];
+// Health takes precedence; anything unmatched is another observation.
+export function topicOf(line) {
+  return ([knowledgeTopics[3],...knowledgeTopics.filter(q=>q.key!=='health'&&q.pattern)].find(q=>q.pattern.test(line))||knowledgeTopics[4]).key;
+}
 export function organizeObservation(text) {
   const result=Object.fromEntries(knowledgeTopics.map(q=>[q.key,'']));
   for(const line of text.trim().split(/(?<=[。！？；\n])/).filter(x=>x.trim())){
-    // Preserve verbatim statements, including negations. Health takes precedence.
-    const topic=[knowledgeTopics[3],...knowledgeTopics.filter(q=>q.key!=='health'&&q.pattern)].find(q=>q.pattern.test(line))||knowledgeTopics[4];
-    result[topic.key]+=(result[topic.key]?'\n':'')+line.trim();
+    // Preserve verbatim statements, including negations.
+    const topic=topicOf(line);
+    result[topic]+=(result[topic]?'\n':'')+line.trim();
   }
   return result;
 }

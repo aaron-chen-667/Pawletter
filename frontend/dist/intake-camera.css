@@ -1,0 +1,38 @@
+.intake-camera{width:min(440px,calc(100vw - 28px));max-height:calc(100dvh - 32px);margin:auto;padding:0;border:1px solid #e2e5ed;border-radius:26px;background:#f8f9fc;color:#191b24;overflow:auto;box-shadow:0 18px 80px #10172733;font:inherit}
+.intake-camera::backdrop{background:#18202f99;backdrop-filter:blur(5px)}
+.intake-camera [hidden]{display:none!important}
+.intake-camera button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.intake-camera button:focus-visible{outline:3px solid #6572d4;outline-offset:3px}
+.intake-camera button:disabled{opacity:.45;cursor:default}
+.intake-camera svg{width:23px;height:23px;flex-shrink:0}
+.intake-camera-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px 10px 22px}
+.intake-camera-header h2{margin:0;font-size:17px;font-weight:700}
+.intake-camera-icon{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:#46536c}
+.intake-camera-icon:hover{background:#edf0f5}
+.intake-camera-frame{position:relative;min-height:180px;aspect-ratio:4/5;max-height:calc(100dvh - 260px);margin:0 14px;border-radius:18px;overflow:hidden;background:#21252d}
+.intake-camera-live,.intake-camera-preview,.intake-camera-preview>img,.intake-camera-preview>video{display:block;width:100%;height:100%;position:absolute;inset:0;object-fit:contain}
+.intake-camera-live{object-fit:cover}
+.intake-camera-mirrored{transform:scaleX(-1)}
+.intake-camera-status{position:absolute;left:50%;top:12px;transform:translateX(-50%);margin:0;white-space:nowrap;border-radius:20px;padding:7px 12px;background:#111827bb;color:#fff;font-size:12px;font-variant-numeric:tabular-nums}
+.intake-camera-status:empty{display:none}
+.intake-camera-recording .intake-camera-status:before{content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:#ff7e83}
+.intake-camera-feedback{text-align:center;padding:0 20px}
+.intake-camera-error{margin:10px 0 0;font-size:13px;line-height:1.6;color:#a92c4d}
+.intake-camera-error:empty{display:none}
+.intake-camera-retry{min-height:44px;padding:8px 12px;border:0;border-radius:12px;background:#eff0ff;color:#424bc4;margin-top:8px}
+.intake-camera-controls{padding:16px 24px 20px}
+.intake-camera-buttons{display:grid;grid-template-columns:1fr 90px 1fr;align-items:center;justify-items:center;gap:10px}
+.intake-camera-shutter{display:grid;place-items:center;width:76px;height:76px;padding:5px;border:2px solid #191b24;border-radius:50%;background:transparent;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.intake-camera-shutter span{display:block;width:60px;height:60px;border-radius:50%;background:var(--action,#d5ff62);transition:border-radius .12s ease,transform .12s ease}
+.intake-camera-shutter:active span{transform:scale(.9)}
+.intake-camera-recording .intake-camera-shutter span{width:29px;height:29px;border-radius:8px;background:#a92c4d}
+.intake-camera-video{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:62px;min-height:54px;padding:6px;border:0;border-radius:12px;background:transparent;color:#46536c;font-size:11px!important}
+.intake-camera-video:hover{background:#edf0f5}
+.intake-camera-stop-mark{width:20px;height:20px;margin:2px;border-radius:5px;background:#a92c4d}
+.intake-camera-controls>p{margin:12px 0 0;color:#65718a;font-size:12px;text-align:center}
+.intake-camera-review{display:flex;gap:12px;padding:18px}
+.intake-camera-review button{min-height:48px;padding:12px 18px;border-radius:15px;font-size:14px;font-weight:700}
+.intake-camera-secondary{flex:1;border:1px solid #dce2ee;background:#fff;color:#46546f}
+.intake-camera-primary{flex:2;border:1px solid transparent;background:var(--action,#d5ff62);color:var(--action-ink,#191b24)}
+@media(max-height:540px){.intake-camera{max-height:calc(100dvh - 16px)}.intake-camera-frame{min-height:120px;max-height:calc(100dvh - 205px)}.intake-camera-controls{padding:10px 20px}.intake-camera-controls>p{margin-top:5px}.intake-camera-shutter{width:60px;height:60px}.intake-camera-shutter span{width:46px;height:46px}}
+@media(prefers-reduced-motion:reduce){.intake-camera-shutter span{transition:none}}

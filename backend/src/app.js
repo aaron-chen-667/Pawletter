@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { randomUUID } from 'node:crypto';
 import { z, ZodError } from 'zod';
-import { authenticate, digest, login } from './auth.js';
+import { authenticate, canReadAllStations, canReadStation, digest, login } from './auth.js';
 import { ApiError, assert } from './errors.js';
 import { transaction } from './db.js';
 import { processOne } from './worker.js';
@@ -12,22 +12,22 @@ import {registerAdopter,adopterProfile,reserveBudget,answerOptions,answersSchema
 import {petProfileSchema,voiceSchema,defaultVoice,readAgent} from './pet-agent.js';
 import {applicationRoutes} from './applications.js';
 import {followupRoutes} from './followups.js';
-import {intakeRoutes} from './intake.js';
+import {intakeRoutes,storeVisuals,jpegImage} from './intake.js';
+import {createOriginCheck} from './origins.js';
 
 const text = max => z.string().trim().min(1).max(max);
-const observationBody = z.object({text:z.string().trim().max(12000).default(''),mediaId:z.string().uuid().optional(),shareWithAgent:z.boolean().default(false),replacesId:z.string().uuid().optional()}).strict().refine(v=>!!v.text || !!v.mediaId,'Text or audio is required');
+// observedOn is when it happened (Beijing calendar day, never in the future); created_at stays the entry time.
+const beijingToday = () => new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Shanghai'});
+const observationBody = z.object({text:z.string().trim().max(12000).default(''),mediaId:z.string().uuid().optional(),shareWithAgent:z.boolean().default(false),replacesId:z.string().uuid().optional(),observedOn:z.iso.date().refine(d=>d>='2000-01-01'&&d<=beijingToday(),'OBSERVED_ON_INVALID').optional(),photos:z.array(jpegImage).max(3).default([]),video:z.string().max(14500000).optional()}).strict().refine(v=>!!v.text || !!v.mediaId || v.photos.length>0 || !!v.video,'Content is required');
 const publicPet = row => ({id:row.id,name:row.name,stationId:row.station_id,published:row.published,profile:row.profile});
 const topicWords={health:'健康|肠胃|软便|呕吐|生病|疫苗|绝育|过敏|食欲',diet:'饮食|吃|喝|粮|喂|罐头',habits:'作息|习惯|睡|独处|厕所|猫砂|散步',likes:'喜欢|玩|抱|摸|怕|躲|亲近|互动'};
-export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin = 'https://pawletter-adoption-h5.chenaaron668.chatgpt.site', logger = false }) {
-  const allowedOrigins=[...new Set(origin.split(',').map(value=>{
-    const url=new URL(value.trim());
-    if(!['https:','http:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('INVALID_FRONTEND_ORIGIN');
-    return url.origin;
-  }))];
+export async function createApp({ db, ai, storage, workerAuth = async()=>false, origin, additionalOrigins, logger = false }) {
+  const isAllowedOrigin = createOriginCheck(origin, additionalOrigins);
   const app = Fastify({logger,disableRequestLogging:true,bodyLimit:20*1024*1024,requestTimeout:180000,trustProxy:false});
   const deps = {db,ai,storage};
   // The public asset URL is server-owned, never accepted from an intake client.
-  await app.register(cors,{origin:allowedOrigins,methods:['GET','POST','DELETE','OPTIONS'],allowedHeaders:['Content-Type','Authorization','Idempotency-Key'],credentials:false});
+  const apiOrigin=process.env.WORKER_AUDIENCE||'https://pawletter-api-446222711695.asia-east1.run.app';
+  await app.register(cors,{origin:(requestOrigin,done)=>done(null,isAllowedOrigin(requestOrigin)),methods:['GET','POST','DELETE','OPTIONS'],allowedHeaders:['Content-Type','Authorization','Idempotency-Key'],credentials:false});
   await app.register(rateLimit,{max:60,timeWindow:'1 minute'});
   app.addContentTypeParser(audioTypes,{parseAs:'buffer'},(req,body,done)=>done(null,body));
   app.setErrorHandler((err,request,reply)=>{
@@ -42,18 +42,33 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   app.get('/ready',async(req,reply)=>{try {await db.query('SELECT 1');return {ok:true};}catch{return reply.code(503).send({ok:false});}});
   const auth = async req => { req.user = await authenticate(db,req); };
   await followupRoutes(app,{db});
-  await intakeRoutes(app,{db,ai,storage,origin:process.env.WORKER_AUDIENCE||'https://pawletter-api-446222711695.asia-east1.run.app'});
-  async function petFor(user,id,write=false) {
+  await intakeRoutes(app,{db,ai,storage,origin:apiOrigin});
+  async function findPet(id) {
     const pet = (await db.query('SELECT * FROM pets WHERE id=$1',[id])).rows[0];
     assert(pet,404,'PET_NOT_FOUND');
+    return pet;
+  }
+  async function petFor(user,id,write=false) {
+    const pet = await findPet(id);
     if (write) assert(user.role==='station' && user.station_id===pet.station_id,403,'STATION_REQUIRED');
-    else assert(pet.published || user.station_id===pet.station_id,404,'PET_NOT_FOUND');
+    else assert(pet.published || canReadStation(user,pet.station_id),404,'PET_NOT_FOUND');
+    return pet;
+  }
+  async function stationPetFor(user,id) {
+    const pet = await findPet(id);
+    assert(canReadStation(user,pet.station_id),403,'STATION_REQUIRED');
+    return pet;
+  }
+  async function chatPetFor(user,id) {
+    const pet = await findPet(id);
+    // Cross-station archive access does not expand the existing chat audience.
+    assert(pet.published || user.station_id===pet.station_id,404,'PET_NOT_FOUND');
     return pet;
   }
   const audit = (client,user,action,id) => client.query('INSERT INTO audit_events(id,actor_id,action,target_id) VALUES($1,$2,$3,$4)',[randomUUID(),user.id,action,id]);
   app.post('/v1/onboarding/transcribe',{bodyLimit:6*1024*1024,config:{rateLimit:{max:8,timeWindow:'1 minute'}}},async(req,reply)=>{
     // Origin is a browser boundary, not authentication. Shared quotas bound anonymous spend.
-    assert(allowedOrigins.includes(req.headers.origin),403,'ORIGIN_REQUIRED');
+    assert(isAllowedOrigin(req.headers.origin),403,'ORIGIN_REQUIRED');
     const mime=req.headers['content-type']?.split(';')[0];
     assert(validAudio(req.body,mime),400,'INVALID_AUDIO_FILE');
     await transaction(db,async client=>{
@@ -71,7 +86,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     try{return {text:await ai.transcribe(req.body,mime)};}catch(error){if(error.code==='AI_RATE_LIMITED'){reply.header('Retry-After','30');throw new ApiError(429,'SPEECH_PROVIDER_BUSY');}throw error;}
   });
   app.post('/v1/onboarding/interview',{config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async req=>{
-    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    assert(isAllowedOrigin(req.headers.origin),403,'ORIGIN_REQUIRED');
     const body=z.object({key:z.enum(Object.keys(answerOptions)),text:text(2000)}).strict().parse(req.body);
     await reserveBudget(db,'interview',10,200);
     const result=await ai.interview(body.key,body.text,answerOptions[body.key]);
@@ -79,12 +94,12 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     assert(parsed.success,502,'AI_INVALID_RESPONSE');return parsed.data;
   });
   app.post('/v1/onboarding/summary',{config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async req=>{
-    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    assert(isAllowedOrigin(req.headers.origin),403,'ORIGIN_REQUIRED');
     const answers=answersSchema.parse(req.body);await reserveBudget(db,'summary',5,100);
     const result=analysisSchema.safeParse(await ai.summarizeLifestyle(answers));assert(result.success,502,'AI_INVALID_RESPONSE');return result.data;
   });
   app.post('/v1/auth/register',{config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{
-    assert(req.headers.origin===origin,403,'ORIGIN_REQUIRED');
+    assert(isAllowedOrigin(req.headers.origin),403,'ORIGIN_REQUIRED');
     const result=await registerAdopter(db,req.body,req.headers['idempotency-key']);return reply.code(201).send(result);
   });
   app.get('/v1/adopter/profile',{preHandler:auth},async req=>{assert(req.user.role==='adopter',403,'ADOPTER_REQUIRED');return adopterProfile(db,req.user.id);});
@@ -101,9 +116,13 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     return login(db,body.username,body.password);
   });
   app.post('/v1/auth/logout',{preHandler:auth},async req=>{await db.query('DELETE FROM sessions WHERE token_hash=$1',[digest(req.headers.authorization.slice(7))]);return {ok:true};});
-  app.get('/v1/me',{preHandler:auth},async req=>({id:req.user.id,role:req.user.role,stationId:req.user.station_id}));
+  app.get('/v1/me',{preHandler:auth},async req=>({id:req.user.id,role:req.user.role,stationId:req.user.station_id,canReadAllStations:canReadAllStations(req.user)}));
+  app.get('/v1/stations',{preHandler:auth},async req=>{
+    assert(req.user.role==='station',403,'STATION_REQUIRED');
+    return {stations:(await db.query('SELECT id,name FROM stations WHERE id=$1 OR $2::boolean ORDER BY name,id',[req.user.station_id,canReadAllStations(req.user)])).rows};
+  });
   app.get('/v1/catalog',async()=>({pets:(await db.query("SELECT p.*,s.name AS station_name FROM pets p JOIN stations s ON s.id=p.station_id WHERE p.published=true AND COALESCE((p.profile->>'internal')::boolean,false)=false AND p.name NOT LIKE '联调·%' ORDER BY p.created_at DESC LIMIT 100")).rows.map(row=>({...publicPet(row),stationName:row.station_name}))}));
-  app.get('/v1/pets',{preHandler:auth},async req=>({pets:(await db.query(req.user.role==='station'?'SELECT * FROM pets WHERE station_id=$1 ORDER BY created_at DESC':'SELECT * FROM pets WHERE published=true OR station_id=$1 ORDER BY created_at DESC LIMIT 100',[req.user.station_id])).rows.map(publicPet)}));
+  app.get('/v1/pets',{preHandler:auth},async req=>({pets:(await db.query(req.user.role==='station'?'SELECT * FROM pets WHERE station_id=$1 OR $2::boolean ORDER BY created_at DESC':'SELECT * FROM pets WHERE published=true OR station_id=$1 ORDER BY created_at DESC LIMIT 100',req.user.role==='station'?[req.user.station_id,canReadAllStations(req.user)]:[req.user.station_id])).rows.map(publicPet)}));
   app.post('/v1/pets',{preHandler:auth},async(req,reply)=>{
     assert(req.user.role==='station',403,'STATION_REQUIRED');
     const body = z.object({name:text(80),profile:petProfileSchema,published:z.boolean().default(false)}).strict().parse(req.body);
@@ -133,13 +152,14 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   });
   app.get('/v1/media/:id',{preHandler:auth},async(req,reply)=>{
     const media=(await db.query('SELECT * FROM media WHERE id=$1',[req.params.id])).rows[0];assert(media,404,'MEDIA_NOT_FOUND');
-    await petFor(req.user,media.pet_id,true);
+    await stationPetFor(req.user,media.pet_id);
     return reply.type(media.mime).send(await storage.read(media.object_name));
   });
-  app.post('/v1/pets/:id/observations',{preHandler:auth},async(req,reply)=>{
+  app.post('/v1/pets/:id/observations',{preHandler:auth,bodyLimit:20*1024*1024},async(req,reply)=>{
     await petFor(req.user,req.params.id,true);
     const body=observationBody.parse(req.body), key=z.string().uuid().parse(req.headers['idempotency-key']);
     const hash=digest(JSON.stringify({petId:req.params.id,...body}));
+    const objects=[];
     const result=await transaction(db,async client=>{
       // Same user/key cannot create duplicates, even across concurrent requests.
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[req.user.id+key]);
@@ -152,16 +172,24 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
         await client.query("UPDATE observations SET status='withdrawn',lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1",[old.id]);
       }
       const id=randomUUID();
-      await client.query('INSERT INTO observations(id,pet_id,author_id,idempotency_key,request_hash,original_text,media_id,share_with_agent,replaces_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[id,req.params.id,req.user.id,key,hash,body.text,body.mediaId||null,body.shareWithAgent,body.replacesId||null]);
+      await client.query('INSERT INTO observations(id,pet_id,author_id,idempotency_key,request_hash,original_text,media_id,share_with_agent,replaces_id,observed_on,has_visuals) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[id,req.params.id,req.user.id,key,hash,body.text,body.mediaId||null,body.shareWithAgent,body.replacesId||null,body.observedOn||null,body.photos.length>0||!!body.video]);
+      // A correction keeps the photos of the record it replaces.
+      if(body.replacesId)await client.query('UPDATE media SET observation_id=$1 WHERE observation_id=$2',[id,body.replacesId]);
+      await storeVisuals(client,storage,{petId:req.params.id,ownerId:req.user.id,observationId:id,photos:body.photos,video:body.video},objects);
       await audit(client,req.user,body.replacesId?'observation.corrected':'observation.created',id);
       return {id,duplicate:false};
-    });
+    }).catch(async e=>{await Promise.allSettled(objects.map(o=>storage.remove(o)));throw e;});
     return reply.code(result.duplicate?200:202).send(result);
   });
   app.get('/v1/pets/:id/observations',{preHandler:auth},async req=>{
-    await petFor(req.user,req.params.id,true);
+    await stationPetFor(req.user,req.params.id);
     const q=z.object({q:z.string().max(200).default(''),status:z.enum(['all','archived','processing','failed','withdrawn']).default('all'),from:z.union([z.iso.date(),z.literal('')]).default(''),to:z.union([z.iso.date(),z.literal('')]).default(''),order:z.enum(['asc','desc']).default('desc'),id:z.string().max(100).default('')}).parse(req.query);
-    return {observations:(await db.query(`SELECT id,original_text,transcript,media_id,share_with_agent,status,attempts,error_code,replaces_id,created_at,updated_at FROM observations WHERE pet_id=$1 AND ($2='' OR position(lower($2) in lower(original_text||' '||COALESCE(transcript,'')))>0) AND ($3='all' OR status=$3 OR ($3='processing' AND status='queued')) AND ($4::date IS NULL OR created_at>=($4::date::timestamp AT TIME ZONE 'Asia/Shanghai')) AND ($5::date IS NULL OR created_at<(($5::date+1)::timestamp AT TIME ZONE 'Asia/Shanghai')) AND ($6='' OR id=$6) ORDER BY created_at ${q.order==='asc'?'ASC':'DESC'},id LIMIT 100`,[req.params.id,q.q,q.status,q.from||null,q.to||null,q.id])).rows};
+    // Records sort and filter by the day the event happened, falling back to the entry day.
+    const day="COALESCE(o.observed_on,(o.created_at AT TIME ZONE 'Asia/Shanghai')::date)",dir=q.order==='asc'?'ASC':'DESC';
+    const rows=(await db.query(`SELECT o.id,o.original_text,o.transcript,o.media_id,o.share_with_agent,o.status,o.attempts,o.error_code,o.replaces_id,o.created_at,o.updated_at,to_char(o.observed_on,'YYYY-MM-DD') AS observed_on,
+      (SELECT COALESCE(json_agg(json_build_object('slot',split_part(m.object_name,'/',4),'mime',m.mime) ORDER BY m.object_name),'[]'::json) FROM media m WHERE m.observation_id=o.id) AS visuals
+      FROM observations o WHERE o.pet_id=$1 AND ($2='' OR position(lower($2) in lower(o.original_text||' '||COALESCE(o.transcript,'')))>0) AND ($3='all' OR o.status=$3 OR ($3='processing' AND o.status='queued')) AND ($4::date IS NULL OR ${day}>=$4::date) AND ($5::date IS NULL OR ${day}<=$5::date) AND ($6='' OR o.id=$6) ORDER BY ${day} ${dir},o.created_at ${dir},o.id LIMIT 100`,[req.params.id,q.q,q.status,q.from||null,q.to||null,q.id])).rows;
+    return {observations:rows.map(r=>({...r,visuals:(typeof r.visuals==='string'?JSON.parse(r.visuals):r.visuals).map(v=>({url:`${apiOrigin}/v1/pets/${req.params.id}/visual/${v.slot}`,mime:v.mime}))}))};
   });
   async function observationFor(req){const row=(await db.query('SELECT * FROM observations WHERE id=$1',[req.params.id])).rows[0];assert(row,404,'OBSERVATION_NOT_FOUND');await petFor(req.user,row.pet_id,true);return row;}
   app.post('/v1/observations/:id/process',{preHandler:auth,config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async req=>{await observationFor(req);return processOne(deps,req.params.id);});
@@ -193,21 +221,21 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
       AND p.name NOT LIKE '联调·%'`,[req.params.id])).rows[0];
     assert(row,404,'PET_NOT_FOUND');reply.header('Cache-Control','no-store');return row;
   });
-  app.get('/v1/pets/:id/knowledge',{preHandler:auth},async req=>{const pet=await petFor(req.user,req.params.id);return {notes:await notesFor(pet.id,req.user.station_id===pet.station_id)};});
+  app.get('/v1/pets/:id/knowledge',{preHandler:auth},async req=>{const pet=await petFor(req.user,req.params.id);return {notes:await notesFor(pet.id,canReadStation(req.user,pet.station_id))};});
   app.get('/v1/pets/:id/chat',{preHandler:auth},async req=>{
-    const pet=await petFor(req.user,req.params.id);
+    const pet=await chatPetFor(req.user,req.params.id);
     const rows=(await db.query('SELECT question,answer,citations,created_at FROM chats WHERE user_id=$1 AND pet_id=$2 ORDER BY created_at DESC LIMIT 30',[req.user.id,pet.id])).rows.reverse();
     return {messages:rows.flatMap(row=>[...(row.question?[{from:'user',text:row.question,at:row.created_at}]:[]),{from:'pet',text:row.answer,citations:row.citations,at:row.created_at}])};
   });
   app.post('/v1/pets/:id/chat',{preHandler:auth,config:{rateLimit:{max:15,timeWindow:'1 minute'}}},async req=>{
-    const pet=await petFor(req.user,req.params.id), {question}=z.object({question:text(2000)}).strict().parse(req.body);
+    const pet=await chatPetFor(req.user,req.params.id), {question}=z.object({question:text(2000)}).strict().parse(req.body);
     const topics=Object.entries(topicWords).filter(([,pattern])=>new RegExp(pattern).test(question)).map(([topic])=>topic);
     const agent=await readAgent(db,pet);
     const notes=await notesFor(pet.id,false,topics.length?topics:null), result=await ai.answer({pet,agent,notes:notes.slice(0,30),question});
     // Re-read after slow inference: withdrawn/corrected material must not escape in a late answer.
     const active=await notesFor(pet.id,false,topics.length?topics:null), activeIds=new Set(active.map(n=>n.id));
     assert(notes.slice(0,30).every(n=>activeIds.has(n.id)),409,'KNOWLEDGE_CHANGED_RETRY');
-    const latest=await petFor(req.user,pet.id),latestAgent=await readAgent(db,latest);
+    const latest=await chatPetFor(req.user,pet.id),latestAgent=await readAgent(db,latest);
     assert(latestAgent.revision===agent.revision&&latest.name===pet.name&&JSON.stringify(latest.profile)===JSON.stringify(pet.profile),409,'KNOWLEDGE_CHANGED_RETRY');
     assert(Array.isArray(result.citationIds) && result.citationIds.every(id=>notes.slice(0,30).some(n=>n.id===id)),502,'AI_INVALID_ANSWER');
     const citations=active.filter(n=>result.citationIds.includes(n.id));

@@ -1,0 +1,994 @@
+{
+  "version": "client-demo-2026-10-25",
+  "stationName": "春日救助站 · 客户演示",
+  "accounts": [
+    {
+      "key": "station",
+      "username": "demo.station",
+      "role": "station",
+      "nickname": "春日救助站 · 客户演示"
+    },
+    {
+      "key": "empty-station",
+      "username": "demo.station.new",
+      "role": "station",
+      "nickname": "新站入驻 · 客户演示"
+    },
+    {
+      "key": "main",
+      "username": "demo.adopter",
+      "role": "adopter",
+      "nickname": "小禾",
+      "verified": true
+    },
+    {
+      "key": "new",
+      "username": "demo.adopter.new",
+      "role": "adopter",
+      "nickname": "初见",
+      "verified": false
+    },
+    {
+      "key": "ning",
+      "username": "demo.adopter.ning",
+      "role": "adopter",
+      "nickname": "阿宁",
+      "verified": true
+    },
+    {
+      "key": "lin",
+      "username": "demo.adopter.lin",
+      "role": "adopter",
+      "nickname": "小林",
+      "verified": true
+    },
+    {
+      "key": "zhou",
+      "username": "demo.adopter.zhou",
+      "role": "adopter",
+      "nickname": "小周",
+      "verified": true
+    },
+    {
+      "key": "xia",
+      "username": "demo.adopter.xia",
+      "role": "adopter",
+      "nickname": "阿夏",
+      "verified": true
+    },
+    {
+      "key": "yan",
+      "username": "demo.adopter.yan",
+      "role": "adopter",
+      "nickname": "小言",
+      "verified": false
+    }
+  ],
+  "pets": [
+    {
+      "key": "1",
+      "name": "橙宝",
+      "profile": {
+        "species": "cat",
+        "sex": "male",
+        "age": "约 1 岁",
+        "city": "杭州",
+        "character": "慢热、熟悉后亲人",
+        "description": "刚见面时，我会先偷偷观察你。等熟悉了，就想在你身边找个舒服的位置，一起发发呆。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/orange.jpg",
+        "latitude": 30.284,
+        "longitude": 120.168,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": false,
+      "asset": "orange.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "平时喜欢追羽毛逗猫棒，玩五分钟会自己休息。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "pending",
+          "quote": "本站接收的绝育记录注明已完成绝育；疫苗日期仍待核对。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "2",
+      "name": "芝士",
+      "profile": {
+        "species": "cat",
+        "sex": "female",
+        "age": "约 2 岁",
+        "city": "杭州",
+        "character": "安静、独立",
+        "description": "我喜欢有阳光的窗边，也喜欢不慌不忙的陪伴。你忙你的，我在旁边就很好。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/tabby.jpg",
+        "latitude": 30.31,
+        "longitude": 120.128,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": false,
+      "asset": "tabby.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "平时喜欢在窗边晒太阳，不喜欢突然被抱起。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "observation",
+          "quote": "照护记录显示上月完成驱虫；后续免疫安排需要核对原始记录。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "3",
+      "name": "布布",
+      "profile": {
+        "species": "dog",
+        "sex": "male",
+        "age": "约 2 岁",
+        "city": "上海",
+        "character": "活泼、亲人",
+        "description": "散步、闻闻草地、陪你走一段路，是我每天最期待的事。希望你也愿意给散步留一点时间。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog.jpg",
+        "latitude": 31.23,
+        "longitude": 121.474,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": false,
+      "asset": "dog.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "每天傍晚期待散步，喜欢闻草地。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "observation",
+          "quote": "交接前需与救助站共同核对免疫和驱虫记录。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "4",
+      "name": "团团",
+      "profile": {
+        "species": "cat",
+        "sex": "male",
+        "age": "约 1 岁 8 个月",
+        "city": "杭州",
+        "character": "亲人、好奇，见陌生人会先观察",
+        "description": "喜欢看窗外的鸟，吃饭前会轻轻叫两声。熟悉后会在沙发另一端陪你，不太喜欢被长时间抱着。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-01.jpg",
+        "latitude": 30.284,
+        "longitude": 120.168,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": false,
+      "asset": "cat-01.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "熟悉的人坐下后，通常会靠近闻一闻。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "observation",
+          "quote": "到家后第三天食欲与排便正常，这是领养者当次反馈。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "5",
+      "name": "麦穗",
+      "profile": {
+        "species": "cat",
+        "sex": "male",
+        "age": "约 4 岁",
+        "city": "杭州",
+        "character": "安静、慢热，需要稳定作息",
+        "description": "我有自己的休息时间，不会一直追着你跑。你坐下来读书，我可能就靠近一点点。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-02.jpg",
+        "latitude": 30.31,
+        "longitude": 120.128,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": false,
+      "asset": "cat-02.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "平时喜欢独处，有互动意愿时会主动靠近。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "observation",
+          "quote": "本周梳毛时未观察到皮肤异常，不能替代体检。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "6",
+      "name": "桃酥",
+      "profile": {
+        "species": "cat",
+        "sex": "female",
+        "age": "约 3 岁",
+        "city": "杭州",
+        "character": "温和、熟悉后亲人，喜欢午睡",
+        "description": "我喜欢松软的毯子，会把一天的大部分时间分给睡觉。醒来以后，愿意跟你玩几分钟逗猫棒。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-03.jpg",
+        "latitude": 30.284,
+        "longitude": 120.168,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": true,
+      "asset": "cat-03.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "平时喜欢柔软的毯子，午后常在上面睡觉。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "pending",
+          "quote": "昨天比平时吃得少，原因不确定，需继续观察。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "7",
+      "name": "可可",
+      "profile": {
+        "species": "dog",
+        "sex": "male",
+        "age": "约 3 岁",
+        "city": "杭州",
+        "character": "亲人、活泼，学习时注意力较好",
+        "description": "看见牵引绳就会期待出门。散步时我想闻很多地方，你愿意陪我慢一点吗？",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog-01.jpg",
+        "latitude": 30.284,
+        "longitude": 120.168,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": true,
+      "asset": "dog-01.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "每天散步时喜欢找玩具，兴奋时需要耐心引导。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "observation",
+          "quote": "最近一次回访反馈进食正常，仍按交接计划定期检查。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "8",
+      "name": "栗子",
+      "profile": {
+        "species": "cat",
+        "sex": "male",
+        "age": "约 2 岁 6 个月",
+        "city": "杭州",
+        "character": "谨慎、独立，熟悉后互动积极",
+        "description": "新地方我会先巡逻一圈。你不用着急靠近，把玩具放在旁边，等我主动发出邀请就好。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-04.jpg",
+        "latitude": 30.31,
+        "longitude": 120.128,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": true,
+      "asset": "cat-04.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "平时喜欢在高一点的猫爬架上观察周围。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "pending",
+          "quote": "领养者提供了复查信息，具体结论待救助站核对。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "9",
+      "name": "米糕",
+      "profile": {
+        "species": "cat",
+        "sex": "female",
+        "age": "约 10 个月",
+        "city": "杭州",
+        "character": "亲人、活泼，会主动蹭熟人",
+        "description": "熟悉以后我会用脑袋轻轻碰你的手。陪我玩一会儿，再让我自己休息，就是很好的下午。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-05.jpg",
+        "latitude": 30.284,
+        "longitude": 120.168,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": true,
+      "asset": "cat-05.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "平时喜欢用额头轻碰熟悉的人的手。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "pending",
+          "quote": "今天出现软便，尚未确定原因，已建议联系兽医评估。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "10",
+      "name": "云团",
+      "profile": {
+        "species": "dog",
+        "sex": "female",
+        "age": "约 2 岁",
+        "city": "上海",
+        "character": "聪明、敏感，运动需求较高",
+        "description": "新指令我学得很认真，但也会被路边的新鲜气味分心。希望你愿意和我练习，而不是只看我聪不聪明。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/dog-02.jpg",
+        "latitude": 31.23,
+        "longitude": 121.474,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": true,
+      "asset": "dog-02.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "平时喜欢慢慢散步，回家后通常安静休息。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "observation",
+          "quote": "最近一次电话回访未报告明显异常。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "11",
+      "name": "小满",
+      "profile": {
+        "species": "cat",
+        "sex": "female",
+        "age": "约 8 个月",
+        "city": "杭州",
+        "character": "好奇、活泼，喜欢追逐玩具",
+        "description": "什么东西在动？让我看看。玩累了我会找一个安静角落充电，醒来又是新的探险时间。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-06.jpg",
+        "latitude": 30.31,
+        "longitude": 120.128,
+        "demoData": true
+      },
+      "published": false,
+      "adopted": false,
+      "asset": "cat-06.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "observation",
+          "quote": "今天第一次接触逗猫棒，尚未确认长期喜好。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "pending",
+          "quote": "年龄和疫苗记录暂不清楚，等待原救助者补充。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    },
+    {
+      "key": "12",
+      "name": "泡芙",
+      "profile": {
+        "species": "cat",
+        "sex": "male",
+        "age": "约 3 岁 6 个月",
+        "city": "上海",
+        "character": "温和、慢热，不喜欢被突然抱起",
+        "description": "我表情变化不大，喜欢不喜欢要看行动。熟悉后，我会选择在离你不远的地方坐下。",
+        "photoUrl": "https://pawletter-adoption-h5.chenaaron668.chatgpt.site/assets/cat-08.jpg",
+        "latitude": 31.23,
+        "longitude": 121.474,
+        "demoData": true
+      },
+      "published": true,
+      "adopted": false,
+      "asset": "cat-08.jpg",
+      "notes": [
+        {
+          "topic": "likes",
+          "certainty": "ongoing",
+          "quote": "平时对新玩具感兴趣，玩累后会回窝休息。",
+          "daysAgo": 25,
+          "shared": true
+        },
+        {
+          "topic": "health",
+          "certainty": "pending",
+          "quote": "送养者称已绝育，原始凭证仍待核实。",
+          "daysAgo": 2,
+          "shared": true
+        },
+        {
+          "topic": "habits",
+          "certainty": "ongoing",
+          "quote": "每天傍晚活动后会安静休息，照护者会留出独处空间。",
+          "daysAgo": 18,
+          "shared": true
+        },
+        {
+          "topic": "diet",
+          "certainty": "observation",
+          "quote": "昨天按原来的喂食安排进食，没有新增零食。",
+          "daysAgo": 1,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "pending",
+          "quote": "对陌生环境的适应时间尚不确定，建议先沟通并安排见面。",
+          "daysAgo": 8,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "ongoing",
+          "quote": "领养家庭需做好防逃逸措施，家人共同同意领养，并配合到家回访。",
+          "daysAgo": 16,
+          "shared": true
+        },
+        {
+          "topic": "other",
+          "certainty": "observation",
+          "quote": "本站交班提醒：下午由值班志愿者补充观察；本条仅供站内协作。",
+          "daysAgo": 0,
+          "shared": false
+        }
+      ]
+    }
+  ],
+  "applications": [
+    {
+      "key": "review",
+      "pet": "3",
+      "user": "main",
+      "stage": 0,
+      "daysAgo": 1,
+      "note": "家里已经封窗，白天上班、晚上在家。想先了解它独处和饮食的习惯，再约时间见面。"
+    },
+    {
+      "key": "meeting",
+      "pet": "4",
+      "user": "ning",
+      "stage": 1,
+      "daysAgo": 5,
+      "note": "周末可以到站见面，家人同意共同照护。希望先让它慢慢熟悉我们。"
+    },
+    {
+      "key": "handover",
+      "pet": "5",
+      "user": "lin",
+      "stage": 2,
+      "daysAgo": 8,
+      "note": "已经完成见面，猫砂盆和独立休息区已准备好。交接时一起核对照护记录。"
+    },
+    {
+      "key": "home",
+      "pet": "6",
+      "user": "main",
+      "stage": 3,
+      "daysAgo": 10,
+      "followup": "pending",
+      "note": "有稳定照护时间，已完成交接，正在帮助它适应新家。"
+    },
+    {
+      "key": "pending",
+      "pet": "7",
+      "user": "ning",
+      "stage": 3,
+      "daysAgo": 7,
+      "followup": "pending",
+      "note": "家人分担早晚散步，愿意按约定反馈适应情况。"
+    },
+    {
+      "key": "confirmation",
+      "pet": "8",
+      "user": "lin",
+      "stage": 3,
+      "daysAgo": 20,
+      "followup": "confirmation",
+      "note": "已提供最近一次照护情况，等待救助站确认。"
+    },
+    {
+      "key": "attention",
+      "pet": "9",
+      "user": "zhou",
+      "stage": 3,
+      "daysAgo": 12,
+      "followup": "attention",
+      "note": "已为它准备独立安静空间，遇到变化会及时沟通。"
+    },
+    {
+      "key": "completed",
+      "pet": "10",
+      "user": "xia",
+      "stage": 3,
+      "daysAgo": 45,
+      "followup": "completed",
+      "note": "已经形成规律散步与休息节奏，按约完成本期回访。"
+    },
+    {
+      "key": "ended",
+      "pet": "12",
+      "user": "yan",
+      "stage": -1,
+      "daysAgo": 15,
+      "note": "本次因近期搬家暂缓申请，后续安顿好再重新认识。"
+    }
+  ],
+  "followupNotes": {
+    "pending": "约定明天下午回访，了解进食、排便和新环境适应情况。",
+    "confirmation": "已通过电话收到反馈：饮食正常，逐渐愿意靠近家人。等待值班同事核对记录。",
+    "attention": "反馈今天出现软便，原因尚不确定。已建议联系兽医，明天跟进最新情况。",
+    "completed": "已完成本期电话回访，领养者反馈规律进食与散步；下期按计划联系。"
+  }
+}

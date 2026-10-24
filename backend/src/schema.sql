@@ -64,6 +64,11 @@ CREATE TABLE IF NOT EXISTS chats (
  question text NOT NULL, answer text NOT NULL, citations jsonb NOT NULL DEFAULT '[]',
  created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS chats_user_pet_time ON chats(user_id,pet_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS chat_reads (
+ user_id text NOT NULL REFERENCES users(id),pet_id text NOT NULL REFERENCES pets(id),
+ read_at timestamptz NOT NULL,PRIMARY KEY(user_id,pet_id)
+);
 CREATE TABLE IF NOT EXISTS audit_events (
  id text PRIMARY KEY, actor_id text, action text NOT NULL, target_id text NOT NULL,
  created_at timestamptz NOT NULL DEFAULT now()

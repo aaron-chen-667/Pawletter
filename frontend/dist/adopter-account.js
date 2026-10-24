@@ -18,6 +18,8 @@ export function createAdopterAccount(fetcher=fetch,storage=sessionStorage){
   catalog:()=>call('/v1/catalog'),
   facts:id=>call('/v1/catalog/'+encodeURIComponent(id)+'/facts'),
   history:id=>call('/v1/pets/'+encodeURIComponent(id)+'/chat'),
+  conversations:()=>call('/v1/conversations'),
+  readConversation:(id,through)=>call('/v1/pets/'+encodeURIComponent(id)+'/chat/read',{body:{through}}),
   chat:(id,question)=>call('/v1/pets/'+encodeURIComponent(id)+'/chat',{body:{question}}),
   applications:()=>call('/v1/applications'),
   apply:(id,body,key)=>call('/v1/pets/'+encodeURIComponent(id)+'/applications',{body,headers:{'Idempotency-Key':key}}),

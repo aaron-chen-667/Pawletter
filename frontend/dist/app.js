@@ -30,6 +30,20 @@ let interviewVoiceOpen=false;
 let interviewEpoch=0,interviewTurns=[],interviewAnalysis=null,applicationNote='';
 let applicationReview=false,applicationKey=null,applicationBusy=false,applicationError='';
 let catalogRows=[],catalogBusy=true,catalogError='',chatBusy=false,chatError='',chatEpoch=0;
+let conversationPets={},conversationEpoch=0,applicationEpoch=0,conversationError='';
+const messageTime=value=>typeof value==='number'?value:Date.parse(value)||0;
+function knownPet(id){
+ const completed=state.applications.some(a=>a.petId===id&&a.stage===3);
+ const current=activePet(state,id);if(current)return completed?{...current,status:'adopted'}:current;
+ const row=conversationPets[id]||state.applications.find(a=>a.petId===id)?.pet;
+ return row?{...cloudPet(row),status:completed?'adopted':'paused',active:false,confirmed:false,canChat:false}:null;
+}
+function applicationPet(application){return knownPet(application.petId)||{id:application.petId,name:application.pet?.name||'历史宠物档案',image:application.pet?.profile?.photoUrl};}
+function refreshAccountPages(){
+ if(!state.account||exampleMode)return;
+ if(['mine','public-profile','progress','messages'].includes(page.name))void loadApplications(state.account.id);
+ if(['mine','progress','messages'].includes(page.name))void loadConversations(state.account.id);
+}
 let initialPetId=new URL(location.href).searchParams.get('pet');
 let profileFacts=null,factsEpoch=0;
 async function loadProfileFacts(){
@@ -49,7 +63,8 @@ function acceptAccount(profile){
  let saved;try{saved=JSON.parse(sessionStorage.getItem('pawletter.user.'+profile.id));}catch{}
  state=guestState();
  if(saved?.version===1){for(const key of ['following','messages','muted','read','memory','passed','swipeHistory','discoveryMode','location','radius','applicationDrafts'])if(saved[key]!==undefined)state[key]=saved[key];}
- state.account=profile;state.consent=profile.consent!==false;void loadApplications(profile.id);
+ conversationPets={};conversationError='';conversationEpoch++;applicationEpoch++;
+ state.account=profile;state.consent=profile.consent!==false;void loadApplications(profile.id);void loadConversations(profile.id);
  registrationCredentials=null;registrationKey=null;
  if(state.consent)greet(state);
  save();
@@ -153,7 +168,7 @@ const icons = {
   stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',
 };
 function icon(name,cls='') { return `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="${name==='paw'?'currentColor':'none'}" stroke="${name==='paw'?'none':'currentColor'}" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.paw}</svg>`; }
-function photo(p,cls='',extra='') { return `<img class="${cls}" src="${esc(p.image||'./assets/paw.svg')}" alt="${esc(p.name)}的照片" ${extra} />`; }
+function photo(p,cls='',extra='') { return `<img class="${cls}" src="${esc(p?.image||'./assets/paw.svg')}" alt="${esc(p?.name||'宠物')}的照片" ${extra} />`; }
 function button(label,action,cls='button',value='',extra='') { return `<button class="${cls}" data-action="${action}" ${value?`data-value="${esc(value)}"`:''} ${extra}>${label}</button>`; }
 function save() {
  if(exampleMode){try{sessionStorage.setItem(EXAMPLES_KEY,JSON.stringify({...state,exampleVersion:1}));return true;}catch{return false;}}
@@ -174,6 +189,7 @@ function navigate(name,id) {
   page={name,id}; overlay=null; render(); window.scrollTo({top:0,behavior:'instant'});
   if(name==='intake')capture.startCamera();
   if(name==='profile')void loadProfileFacts();
+  refreshAccountPages();
 }
 function leaveCapture(next) {
   factsEpoch++;profileFacts=null;
@@ -200,7 +216,7 @@ function shellHeader() {
 function nav() {
   const rescue=state.role==='rescue';
   const items=rescue?[['work','home','工作台'],['animals','paw','动物'],['tracking','book','跟进']]:[['messages','chat','消息'],['meet','compass','遇见'],['mine','user','我的']];
-  const unread=Object.entries(state.messages).filter(([id,msg])=>msg.some(m=>m.from==='pet'&&m.at>(state.read[id]||0))).length;
+  const unread=Object.entries(state.messages).filter(([id,msg])=>msg.some(m=>m.from==='pet'&&messageTime(m.at)>messageTime(state.read[id]))).length;
   return `<nav class="bottom-nav" aria-label="${rescue?'救助者':'用户'}导航">${items.map(([name,i,label])=>`<button data-action="nav" data-value="${name}" class="nav-item ${page.name===name?'active':''}">${icon(i)}${name==='messages'&&unread?'<i class="nav-dot"></i>':''}<span>${label}</span></button>`).join('')}</nav>`;
 }
 function render() {
@@ -324,22 +340,23 @@ function meetPage() {
   </main>`;
 }
 function messagesPage() {
-  const entries=Object.entries(state.messages).filter(([,m])=>m.length).sort((a,b)=>b[1].at(-1).at-a[1].at(-1).at);
+  const entries=Object.entries(state.messages).filter(([,m])=>m.length).sort((a,b)=>messageTime(b[1].at(-1).at)-messageTime(a[1].at(-1).at));
   return `${shellHeader()}<main class="main messages-page"><section class="messages-guide"><h1>宠物来信 <span>先聊聊，再决定</span></h1><p>和宠物 AI 分身聊习惯、喜好与照护。想进一步认识它，就发起领养申请。</p></section>
     ${requestsView()}
+    ${conversationError?`<p role="alert">${esc(conversationError)}</p>${button('重新同步','messages-retry','button secondary')}`:''}
     <div class="consent-card">${icon('spark')}<div><strong>${state.consent===true?'接收宠物分身的招呼':state.consent===false?'主动招呼已暂停':'接收宠物分身的招呼'}</strong><p>按你的偏好推荐，点击开关可暂停。</p></div>${button(state.consent===true?'已开启':'开启','consent',`small-button ${state.consent===true?'muted-button':''}`,state.consent===true?'off':'on')}</div>
-    ${entries.length?`<div class="message-list">${entries.map(([id,messages])=>{ const p=activePet(state,id);if(!p)return''; const last=messages.at(-1);const unread=last.from==='pet'&&last.at>(state.read[id]||0);return `<button class="message-item" data-action="chat" data-value="${id}"><div class="avatar-wrap">${photo(p,'avatar')}${unread?'<i></i>':''}</div><div class="message-preview"><div><strong>${esc(p.name)}</strong><span class="agent-tag">AI 分身</span><time>${state.sampleStory?'最近':'刚刚'}</time></div><p>${esc(last.text)}</p><small>${p.status==='adopted'?'一起生活的第 '+state.day+' 天':state.muted.includes(id)?'主动联系已暂停':unread?'给你发来一声招呼':'正在慢慢了解彼此'}</small></div>${icon('chevron')}</button>`;}).join('')}</div>`:empty('还没有开始聊天','去「遇见」选一只宠物，点击「聊一聊」。它的 AI 分身会根据救助档案回答你的问题。',button('去遇见宠物 '+icon('arrow'),'nav','button primary','meet'))}
+    ${entries.length?`<div class="message-list">${entries.map(([id,messages])=>{ const p=knownPet(id);if(!p)return''; const last=messages.at(-1);const unread=last.from==='pet'&&messageTime(last.at)>messageTime(state.read[id]);return `<button class="message-item" data-action="chat" data-value="${id}"><div class="avatar-wrap">${photo(p,'avatar')}${unread?'<i></i>':''}</div><div class="message-preview"><div><strong>${esc(p.name)}</strong><span class="agent-tag">AI 分身</span><time>${state.sampleStory?'最近':'刚刚'}</time></div><p>${esc(last.text)}</p><small>${p.status==='adopted'?'一起生活的第 '+state.day+' 天':state.muted.includes(id)?'主动联系已暂停':unread?'给你发来一声招呼':'正在慢慢了解彼此'}</small></div>${icon('chevron')}</button>`;}).join('')}</div>`:empty('还没有开始聊天','去「遇见」选一只宠物，点击「聊一聊」。它的 AI 分身会根据救助档案回答你的问题。',button('去遇见宠物 '+icon('arrow'),'nav','button primary','meet'))}
 
 
   </main>`;
 }
 function minePage() {
   const application=state.applications.find(a=>a.stage>=0),account=state.account;
-  const adopted=account?[...new Set(state.applications.filter(a=>a.stage===3&&a.adopterId===account.id).map(a=>a.petId))].map(id=>activePet(state,id)).filter(Boolean):[];
+  const adopted=account?[...new Set(state.applications.filter(a=>a.stage===3&&a.adopterId===account.id).map(a=>a.petId))].map(id=>knownPet(id)).filter(Boolean):[];
   return `${shellHeader()}<main class="main"><div class="personal-card ${adopted.length?'has-pets':''}"><div class="family-avatar-row"><span class="human-avatar">${esc(account?.nickname[0]||'你')}</span>${adopted.length?`<span class="family-plus" aria-hidden="true">+</span>${adopted.map(p=>`<button class="family-pet" data-action="chat" data-value="${p.id}" aria-label="和${esc(p.name)}的 Agent 聊天">${photo(p)}<span>${esc(p.name)}</span><small>AI 分身</small></button>`).join('')}`:''}</div><div class="personal-copy"><p class="eyebrow">MY LITTLE WORLD</p><h1>${account?'你好，'+esc(account.nickname):'让相遇，有个开始。'}</h1><p>${adopted.length?'你和 '+adopted.map(p=>esc(p.name)).join('、')+' 的小日子':account?'账号已注册 · 实名待核验':'先逛逛，准备领养时建立你的账号。'}</p></div></div>
     ${account?button('看看我的个人主页 '+icon('arrow'),'public-profile','button primary full'):button('注册领养账号 '+icon('arrow'),'register','button primary full')+button('已有账号，去登录','adopter-login','text-button full spaced')}
     <div class="stats-row"><div><b>${state.following.length}</b><span>喜欢的小伙伴</span></div><div><b>${state.memory.length}</b><span>偏好与记忆</span></div><div><b>${state.applications.filter(a=>a.stage>=0).length}</b><span>领养申请</span></div></div>
-    <div class="menu-card">${menu('home','我的领养进度',application?activePet(state,application.petId)?.name+' · '+stages[application.stage]:'还没有提交申请','progress')}${menu('heart','救助站评价','0–5 星 · 定期回访与照护记录','ratings')}${menu('clock','生活画像与陪伴时间',account?.lifestyle?'已记录作息、空闲时间与领养预期 · 查看资料':account?'尚未记录 · 补充生活资料':'注册时通过语音对话建立画像','lifestyle')}${menu('shield','身份与领养公约','身份信息不在主页公开','account')}</div>
+    <div class="menu-card">${menu('home','我的领养进度',application?applicationPet(application).name+' · '+stages[application.stage]:'还没有提交申请','progress')}${menu('heart','救助站评价','0–5 星 · 定期回访与照护记录','ratings')}${menu('clock','生活画像与陪伴时间',account?.lifestyle?'已记录作息、空闲时间与领养预期 · 查看资料':account?'尚未记录 · 补充生活资料':'注册时通过语音对话建立画像','lifestyle')}${menu('shield','身份与领养公约','身份信息不在主页公开','account')}</div>
 ${sectionHeading('GETTING TO KNOW YOU','越了解，越合拍')}
     <div class="menu-card">${menu('book','我的偏好与记忆','你说过的喜欢，都可以修改','memory')}${menu('heart','我关注的小伙伴','看看想继续了解的它们','saved')}${menu('shield','主动招呼设置',state.consent?'已开启 · 点击暂停':'未开启 · 点击开启','consent',state.consent?'off':'on')}${menu('home','认识救助站','主页、待领养伙伴与专属 Agent','stations')}</div>
     <div class="join-station">${icon('home')} 我是救助站负责人 ${button('联系开通','station-onboarding','text-button')}</div>${account?`<div class="account-footer">${button('退出当前账号','logout','text-button')}</div>`:''}
@@ -357,7 +374,7 @@ function profilePage() {
   </main><div class="sticky-actions">${button(icon('chat')+' 聊一聊','chat','button secondary',p.id)}${p.status==='adopted'?button('查看到家记录','followup','button primary',p.id):application?button('查看领养进度','progress','button primary',application.id):button('我想领养 '+icon('arrow'),'apply','button primary',p.id,p.status!=='available'?'disabled':'')}</div>`;
 }
 function chatPage() {
-  const p=activePet(state,page.id); if(!p)return empty('没有找到对话','请返回消息列表。');
+  const p=knownPet(page.id); if(!p)return empty('没有找到对话','请返回消息列表。');
   const messages=state.messages[p.id]||[];
   const application=currentApplication(p.id);
   const adopted=p.status==='adopted',day=adoptionDay(state,p.id);
@@ -370,7 +387,7 @@ function chatPage() {
   return `<header class="topbar">${button(icon('back'),'back','icon-button','','aria-label="返回"')}<div class="topbar-title"><strong>${esc(p.name)} <span class="agent-tag">AI 分身</span></strong><small>${adopted?'已经成为家人，继续陪你记录日常':'慢慢认识彼此'}</small></div>${button(icon('more'),'chat-options','icon-button',p.id,'aria-label="对话设置"')}</header>${context}
     <div class="chat-stream" role="log" aria-label="聊天记录" aria-live="polite"><div class="chat-date">${state.sampleStory?'聊天记录':'今天 · 从一句你好开始'}</div>
     ${messages.map(m=>`<div class="chat-message ${m.from==='user'?'outgoing':''}">${m.from==='pet'?photo(p,'chat-avatar'):`<span class="chat-avatar person">${esc((state.account?.nickname||'小禾').slice(0,1))}</span>`}<div class="bubble-wrap"><div class="bubble">${esc(m.text)}</div>${m.reasons?`<small class="bubble-reason">${icon('spark')} ${esc(m.reasons.join(' · '))}</small>`:''}${m.memory?`<button class="memory-inline" data-action="memory">${icon('book')} 已记住你的偏好 · 查看或修改</button>`:''}${m.intent&&!adopted?button('了解领养条件 '+icon('arrow'),'apply','bubble-action',p.id):''}</div></div>`).join('')}
-    </div><div class="chat-bottom">${chatBusy?'<p role="status" class="chat-loading">正在翻阅宠物的档案…</p>':''}${chatError?`<p role="alert" class="chat-error">${esc(chatError)}</p>`:''}<div class="chat-suggestions">${suggestions.map(t=>button(t,'suggestion','suggestion',t)).join('')}</div><form id="chat-form" class="chat-compose"><label class="sr-only" for="chat-input">发送消息</label><input id="chat-input" name="message" placeholder="${adopted?'聊聊你们今天的日常…':'说点什么，慢慢认识它…'}" autocomplete="off" maxlength="500" required /><button class="send-button" type="submit" aria-label="发送消息" ${chatBusy?'disabled':''}>${icon('send')}</button></form></div>`;
+    </div><div class="chat-bottom">${chatBusy?'<p role="status" class="chat-loading">正在翻阅宠物的档案…</p>':''}${chatError?`<p role="alert" class="chat-error">${esc(chatError)}</p>`:''}${p.canChat===false?'<p class="footnote">档案已下架，仍可查看历史对话。</p>':''}<div class="chat-suggestions">${(p.canChat===false?[]:suggestions).map(t=>button(t,'suggestion','suggestion',t)).join('')}</div><form id="chat-form" class="chat-compose"><label class="sr-only" for="chat-input">发送消息</label><input id="chat-input" name="message" placeholder="${adopted?'聊聊你们今天的日常…':'说点什么，慢慢认识它…'}" autocomplete="off" maxlength="500" required /><button class="send-button" type="submit" aria-label="发送消息" ${chatBusy||p.canChat===false?'disabled':''}>${icon('send')}</button></form></div>`;
 }
 function memoryPage() {
   return `${topbar('我的偏好与记忆','让每一次推荐，更懂你的生活')}<main class="main"><div class="memory-hero">${icon('book')}<h1>喜欢，可以慢慢清晰。</h1><p>记住你明确说过的事。<br>也留给你随时改变的自由。</p></div><div class="memory-list">${state.memory.map(m=>`<div class="memory-item"><span class="memory-type">${m.type==='condition'?'生活条件':'我的偏好'}</span><strong>${esc(m.text)}</strong><small>${esc(m.source)}</small><div>${button(icon('edit'),'edit-memory','icon-button',m.id,'aria-label="编辑记忆"')}${button(icon('trash'),'delete-memory','icon-button',m.id,'aria-label="删除记忆"')}</div></div>`).join('')||empty('从一句喜欢开始','聊天中明确表达的偏好会出现在这里。')}</div>${button(icon('plus')+' 补充一条记忆','add-memory','button secondary full')}<p class="footnote">修改会影响下一轮推荐，不会修改动物档案。删除后不再参与匹配；重新明确表达时可再次记住。</p>${button('看看现在更适合谁 '+icon('arrow'),'nav','button primary full','meet')}</main>`;
@@ -449,7 +466,7 @@ function applyPage(){
 
 function progressPage() {
   const applications=state.applications.filter(a=>!a.adopterId||a.adopterId===state.account?.id);
-  return `${topbar('我的领养进度','慢慢来，每一步都值得认真')}<main class="main">${applications.length?applications.map(a=>{const p=activePet(state,a.petId);return `<article class="application-card"><div class="mini-pet-card">${photo(p,'avatar')}<div><h2>${esc(p.name)}</h2><p>${a.stage<0?'申请已结束':stages[a.stage]}</p></div></div><div class="timeline">${stages.map((s,i)=>`<div class="${a.stage>=i?'done':''}"><span>${a.stage>i?icon('check'):i+1}</span><p>${s}</p></div>`).join('')}</div><p class="body-copy">${a.stage===0?'救助者会查看你提交的条件，必要时继续沟通。':a.stage===1?'已进入见面阶段，具体时间地点由双方沟通确认。':a.stage===2?'见面结果已确认，等待双方完成交接。':a.stage===3?'交接已完成。接下来，我们一起记录适应过程。':'该申请已撤回或结束，可以重新认识其他伙伴。'}</p>${a.stage===3?button('进入到家跟进','followup','button primary full',p.id):a.stage>=0?button('撤回申请','withdraw','button secondary full',a.id):''}</article>`;}).join(''):empty('还没有申请','先聊一聊，认真认识一位新朋友。',button('去遇见','nav','button primary','meet'))}</main>`;
+  return `${topbar('我的领养进度','慢慢来，每一步都值得认真')}<main class="main">${applications.length?applications.map(a=>{const p=applicationPet(a);return `<article class="application-card"><div class="mini-pet-card">${photo(p,'avatar')}<div><h2>${esc(p.name)}</h2><p>${a.stage<0?'申请已结束':stages[a.stage]}</p></div></div><div class="timeline">${stages.map((s,i)=>`<div class="${a.stage>=i?'done':''}"><span>${a.stage>i?icon('check'):i+1}</span><p>${s}</p></div>`).join('')}</div><p class="body-copy">${a.stage===0?'救助者会查看你提交的条件，必要时继续沟通。':a.stage===1?'已进入见面阶段，具体时间地点由双方沟通确认。':a.stage===2?'见面结果已确认，等待双方完成交接。':a.stage===3?'交接已完成。接下来，我们一起记录适应过程。':'该申请已撤回或结束，可以重新认识其他伙伴。'}</p>${a.stage===3?button('进入到家跟进','followup','button primary full',p.id):a.stage>=0?button('撤回申请','withdraw','button secondary full',a.id):''}</article>`;}).join(''):empty('还没有申请','先聊一聊，认真认识一位新朋友。',button('去遇见','nav','button primary','meet'))}</main>`;
 }
 function workPage() {
   const station=stationById(state.activeStationId),team=stationPets(state,station.id);
@@ -648,6 +665,7 @@ function trackingPage() {
   }).join(''):empty('等待第一位到家的伙伴','完成交接后，会在这里建立持续记录。',button('查看领养申请','applications','button secondary'))}</main>`;
 }
 function followupPage() {
+  if(!exampleMode)return `${topbar('到家回访')}<main class="main">${empty('在线回访提交尚未开放','请通过与救助站约定的联系方式反馈近况。此页面不会把本地记录当作已提交的回访。',button('查看领养进度','progress','button secondary'))}</main>`;
   const p=activePet(state,page.id);if(!p)return '';
   const rescue=state.role==='rescue',day=adoptionDay(state,p.id);
   if(!rescue&&!currentApplication(p.id))return `${topbar('到家日记')}<main class="main">${empty('这是另一个家庭的私密回访','只有领养该动物的账号和所属站点可以在演示中查看。',button('查看所属站点','station','button secondary',stationFor(p).id))}</main>`;
@@ -717,7 +735,7 @@ function renderOverlay() {
   } else if(overlay.type==='applications') {
     title='领养申请';
     const applications=state.applications.filter(a=>stationFor(activePet(state,a.petId)).id===state.activeStationId).sort((a,b)=>(a.stage<0?4:a.stage)-(b.stage<0?4:b.stage)||(b.createdAt||0)-(a.createdAt||0));
-    body=applications.length?applications.map(a=>{const p=activePet(state,a.petId);return `<button class="animal-row" data-action="application" data-value="${a.id}">${photo(p,'avatar')}<div><strong>${esc(a.name)} → ${esc(p.name)}</strong><small>${a.stage<0?'申请已结束':stages[a.stage]}</small></div>${icon('chevron')}</button>`;}).join(''):empty('暂时没有申请','切换用户端，选择一位小伙伴提交领养意向。');
+    body=applications.length?applications.map(a=>{const p=applicationPet(a);return `<button class="animal-row" data-action="application" data-value="${a.id}">${photo(p,'avatar')}<div><strong>${esc(a.name)} → ${esc(p.name)}</strong><small>${a.stage<0?'申请已结束':stages[a.stage]}</small></div>${icon('chevron')}</button>`;}).join(''):empty('暂时没有申请','切换用户端，选择一位小伙伴提交领养意向。');
   } else if(overlay.type==='confirm-reset') {
     title='从第一封来信重新开始？';
     body=`<p class="body-copy">将清除本 Demo 的聊天、记忆、上传档案、申请和回访记录。此操作只影响当前浏览器。</p>${button('确认重置体验','confirm-reset','button primary full')}`;
@@ -727,18 +745,20 @@ function renderOverlay() {
 }
 function openOverlay(type,id) { overlay={type,id}; renderOverlay(); }
 async function openChat(id){
- if(!state.account){registrationGate('chat',id);return;}const p=activePet(state,id);if(!p)return;
- const ticket=++chatEpoch;chatBusy=true;chatError='';navigate('chat',id);
- try{const result=await accountApi.history(id);if(ticket!==chatEpoch||page.id!==id||page.name!=='chat')return;state.messages[id]=result.messages;
+ if(!state.account){registrationGate('chat',id);return;}const p=knownPet(id);if(!p)return;
+ const ticket=++chatEpoch,owner=state.account.id;chatBusy=true;chatError='';navigate('chat',id);
+ try{const result=await accountApi.history(id);if(ticket!==chatEpoch||owner!==state.account?.id||page.id!==id||page.name!=='chat')return;state.messages[id]=result.messages;
   if(!result.messages.length)addMessage(state,id,'pet',`你好，我是${p.name}的 AI 分身。我的回答来自照顾我的人写下的档案，你想先了解哪一面？`);
-  state.read[id]=Date.now()+1;save();
+  state.read[id]=messageTime(result.messages.at(-1)?.at)||Date.now();save();
+  if(!exampleMode&&result.messages.length)await accountApi.readConversation(id,new Date(state.read[id]).toISOString());
  }catch(e){if(ticket===chatEpoch)chatError=e.message;}finally{if(ticket===chatEpoch){chatBusy=false;if(page.name==='chat'&&page.id===id)render();}}
 }
 async function sendChat(text){
- const p=activePet(state,page.id);if(!p||!text.trim()||chatBusy)return;
+ const p=knownPet(page.id);if(!p||p.canChat===false||!text.trim()||chatBusy)return;
  const question=text.trim().slice(0,500),ticket=++chatEpoch,owner=state.account?.id;chatBusy=true;chatError='';addMessage(state,p.id,'user',question);render();
  try{const result=await accountApi.chat(p.id,question);if(ticket!==chatEpoch||owner!==state.account?.id)return;
   mergeMemory(state,extractMemory(question));addMessage(state,p.id,'pet',result.answer,{citations:result.citations});state.read[p.id]=Date.now()+1;save();
+  if(!exampleMode){try{const history=await accountApi.history(p.id);if(ticket!==chatEpoch||owner!==state.account?.id)return;state.messages[p.id]=history.messages;const at=history.messages.at(-1)?.at;if(at){state.read[p.id]=messageTime(at);save();await accountApi.readConversation(p.id,new Date(state.read[p.id]).toISOString());}}catch{if(ticket===chatEpoch)chatError='回复已保存，已读状态暂未同步。';}}
  }catch(e){if(ticket===chatEpoch){chatError=e.message+' 可以重新发送这句话。';state.messages[p.id]?.pop();}}
  finally{if(ticket===chatEpoch){chatBusy=false;if(page.name==='chat'&&page.id===p.id)render();}}
 }
@@ -790,6 +810,7 @@ document.addEventListener('click',async event=>{
     }
     case 'application-edit':applicationReview=false;render();break;
     case 'catalog-retry':await loadCatalog();break;
+    case 'messages-retry':if(state.account)await loadConversations(state.account.id);break;
     case 'facts-retry':await loadProfileFacts();break;
     case 'nav':navigate(value);break;
     case 'identity':openOverlay('identity');break;
@@ -823,14 +844,14 @@ document.addEventListener('click',async event=>{
     case 'confirm-logout':{
       if(exampleMode){location.assign('./');break;}
       if(!state.account||authBusy)break;authBusy=true;target.disabled=true;
-      try{await accountApi.logout();save();resetLifestyleSpeech();voiceChat.cancel();chatEpoch++;chatBusy=false;await capture.reset();state=guestState();registrationCredentials=null;registrationKey=null;pendingAction=null;draft={photos:[],description:'',sample:false};navigate('meet');navigationStack=[];toast('已退出登录');}catch(e){toast(e.message);target.disabled=false;}finally{authBusy=false;}break;
+      try{await accountApi.logout();save();resetLifestyleSpeech();voiceChat.cancel();chatEpoch++;conversationEpoch++;applicationEpoch++;conversationPets={};conversationError='';chatBusy=false;await capture.reset();state=guestState();registrationCredentials=null;registrationKey=null;pendingAction=null;draft={photos:[],description:'',sample:false};navigate('meet');navigationStack=[];toast('已退出登录');}catch(e){toast(e.message);target.disabled=false;}finally{authBusy=false;}break;
     }
 
     case 'account':case 'station-onboarding':case 'stations':case 'public-profile':case 'ratings':navigate(action,value);break;
     case 'station':navigate('station',value);break;
     case 'unpublish-moment':{if(state.role!=='user')break;const f=state.followups.find(f=>f.id===value&&f.adopterId===state.account?.id);if(f){f.publication={...f.publication,allowed:false,withdrawnAt:Date.now()};save();render();toast('已撤下主页展示，站点回访记录保留');}break;}
     case 'rating-appeal':{const r=state.ratings.find(r=>r.id===value&&r.adopterId===state.account?.id);if(r){r.appeal={at:Date.now()};save();render();toast('复核请求已在本地记录，等待站点核实');}break;}
-    case 'back':{const next=navigationStack.pop()||{name:state.role==='rescue'?'work':'meet'};leaveCapture(next.name);page=next;overlay=null;render();window.scrollTo(0,0);if(page.name==='intake')capture.startCamera();if(page.name==='profile')void loadProfileFacts();break;}
+    case 'back':{const next=navigationStack.pop()||{name:state.role==='rescue'?'work':'meet'};leaveCapture(next.name);page=next;overlay=null;render();window.scrollTo(0,0);if(page.name==='intake')capture.startCamera();if(page.name==='profile')void loadProfileFacts();refreshAccountPages();break;}
     case 'filter':filter=value;render();break;
     case 'location':openOverlay('location');break;
     case 'locate':locateUser();break;
@@ -1119,6 +1140,7 @@ async function analyzeCapture() {
   state.pets.unshift(p);state.draft=null;save();navigate('confirm',id);toast('模拟档案已整理，未知项保留待确认');
 }
 async function submitCheckin(target,publicly=false) {
+  if(!exampleMode){toast('在线回访提交尚未开放，请联系救助站。');return;}
   if(!pendingFeedback||target.disabled||publishingFeedback||!state.account)return;
   const p=activePet(state,pendingFeedback.petId);
   if(state.role!=='user'||!currentApplication(p?.id)||!p||p.status!=='adopted'){toast('领养状态已变化，请重新查看');return;}
@@ -1197,5 +1219,23 @@ window.addEventListener('blur',()=>{voicePointer=null;if(voiceChat.state.holding
 void loadCatalog();
 
 async function loadApplications(ownerId){
- try{const result=await accountApi.applications();if(state.account?.id!==ownerId)return;state.applications=result.applications;if(['mine','public-profile','progress'].includes(page.name))render();}catch(e){if(state.account?.id===ownerId)toast('申请记录暂时无法加载，请稍后重试。');}
+ const ticket=++applicationEpoch;
+ try{const result=await accountApi.applications();if(ticket!==applicationEpoch||state.account?.id!==ownerId)return;state.applications=result.applications;if(['mine','public-profile','progress'].includes(page.name))render();}catch(e){if(ticket===applicationEpoch&&state.account?.id===ownerId)toast('申请记录暂时无法加载，请稍后重试。');}
 }
+async function loadConversations(ownerId){
+ if(exampleMode)return;
+ const ticket=++conversationEpoch;
+ try{
+  const result=await accountApi.conversations();if(ticket!==conversationEpoch||state.account?.id!==ownerId)return;
+  conversationError='';conversationPets={};
+  for(const item of result.conversations){
+   const id=item.pet.id;conversationPets[id]=item.pet;
+   const messages=state.messages[id]||[];
+   if(messageTime(item.lastMessage.at)>messageTime(messages.at(-1)?.at))state.messages[id]=[...messages,item.lastMessage];
+   state.read[id]=Math.max(messageTime(state.read[id]),messageTime(item.readAt));
+  }
+  save();if(['messages','mine'].includes(page.name))render();
+ }catch{if(ticket===conversationEpoch&&state.account?.id===ownerId){conversationError='消息暂时无法同步，请重试。';if(page.name==='messages')render();}}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAccountPages();});
+window.addEventListener('focus',refreshAccountPages);

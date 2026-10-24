@@ -51,8 +51,10 @@ const namedPets=()=>pets.map(p=>({...p,stationName:stationName(p.stationId)}));
 const inScope=row=>!station()||(allStations()&&!stationFilter)||rowStation(row)===(allStations()?stationFilter:user.stationId);
 const resetFilters=()=>Object.assign(workspaceFilters,{application:'all',pet:'all',followup:'all',query:''});
 async function refreshWorkspace(account=user){
+  const ticket=epoch,owner=user;
   const staff=account?.role==='station';
   const [p,a,f,s]=await Promise.all([api.pets(),api.applications(),staff&&api.followups?api.followups():{followups:[]},staff?api.stations():{stations:[]}]);
+  if(ticket!==epoch||owner!==user)return;
   pets=p.pets;applications=a.applications;followups=f.followups||[];stations=s.stations;
   if(stationFilter&&!stations.some(s=>s.id===stationFilter))stationFilter='';
 }
@@ -127,6 +129,12 @@ async function go(next,id,completed=false){
   if(next==='new'){stationFilter=user.stationId;await intake.reset();}
   if(!(completed&&next==='pet'))highlight='';if(id)petId=id;if(next==='pet'){notes=[];records=[];intakeDetails={};Object.assign(recordFilters,{q:'',status:'all',from:'',to:'',order:'desc',id:''});setCategory('all');}view=next;error='';notice='';messages=[];chatText='';render();root.scrollIntoView?.({block:'start'});
   if(next==='pet')await refreshDetail();
+  if(['home','pets','applications','followups'].includes(next))await refreshWorkspaceView();
+}
+async function refreshWorkspaceView(){
+ const ticket=epoch;
+ try{await refreshWorkspace();if(ticket===epoch)render();}
+ catch(e){if(ticket===epoch){failure(e);render();}}
 }
 async function refreshDetail(silent=false){
   const ticket=epoch,id=petId;
@@ -209,7 +217,7 @@ root.addEventListener('submit',async e=>{
   }catch(e){if(form.id==='pet-form')notice='若连接中断，请先返回列表刷新，确认档案是否已建立，再决定是否重试。';failure(e);}
   finally{busy=false;render();}
 });
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&view==='pet'&&!busy)void refreshDetail(true);});
+document.addEventListener('visibilitychange',()=>{if(document.hidden||busy||!user)return;if(view==='pet')void refreshDetail(true);else if(['home','pets','applications','followups'].includes(view))void refreshWorkspaceView();});
 window.addEventListener('pagehide',()=>{clearTimeout(pollTimer);daily.stop();});
 render();
 if(exampleMode){user=api.user();await refreshWorkspace();stationFilter=user.stationId;view='home';render();}

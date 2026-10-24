@@ -14,6 +14,7 @@ import {applicationRoutes} from './applications.js';
 import {followupRoutes} from './followups.js';
 import {intakeRoutes,storeVisuals,jpegImage} from './intake.js';
 import {createOriginCheck} from './origins.js';
+import {conversationRoutes} from './conversations.js';
 
 const text = max => z.string().trim().min(1).max(max);
 // observedOn is when it happened (Beijing calendar day, never in the future); created_at stays the entry time.
@@ -41,6 +42,7 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   app.get('/health',async()=>({ok:true,service:'pawletter-api'}));
   app.get('/ready',async(req,reply)=>{try {await db.query('SELECT 1');return {ok:true};}catch{return reply.code(503).send({ok:false});}});
   const auth = async req => { req.user = await authenticate(db,req); };
+  conversationRoutes({app,db,auth});
   await followupRoutes(app,{db});
   await intakeRoutes(app,{db,ai,storage,origin:apiOrigin});
   async function findPet(id) {
@@ -223,7 +225,8 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
   });
   app.get('/v1/pets/:id/knowledge',{preHandler:auth},async req=>{const pet=await petFor(req.user,req.params.id);return {notes:await notesFor(pet.id,canReadStation(req.user,pet.station_id))};});
   app.get('/v1/pets/:id/chat',{preHandler:auth},async req=>{
-    const pet=await chatPetFor(req.user,req.params.id);
+    const pet=await findPet(req.params.id);
+    if(!pet.published&&req.user.station_id!==pet.station_id)assert((await db.query('SELECT id FROM chats WHERE user_id=$1 AND pet_id=$2 LIMIT 1',[req.user.id,pet.id])).rows.length,404,'PET_NOT_FOUND');
     const rows=(await db.query('SELECT question,answer,citations,created_at FROM chats WHERE user_id=$1 AND pet_id=$2 ORDER BY created_at DESC LIMIT 30',[req.user.id,pet.id])).rows.reverse();
     return {messages:rows.flatMap(row=>[...(row.question?[{from:'user',text:row.question,at:row.created_at}]:[]),{from:'pet',text:row.answer,citations:row.citations,at:row.created_at}])};
   });
@@ -231,7 +234,10 @@ export async function createApp({ db, ai, storage, workerAuth = async()=>false, 
     const pet=await chatPetFor(req.user,req.params.id), {question}=z.object({question:text(2000)}).strict().parse(req.body);
     const topics=Object.entries(topicWords).filter(([,pattern])=>new RegExp(pattern).test(question)).map(([topic])=>topic);
     const agent=await readAgent(db,pet);
-    const notes=await notesFor(pet.id,false,topics.length?topics:null), result=await ai.answer({pet,agent,notes:notes.slice(0,30),question});
+    // Only this user's recent questions supply conversational context. Previous AI
+    // answers may contain withdrawn facts and must not become a second fact source.
+    const history=(await db.query("SELECT question FROM chats WHERE user_id=$1 AND pet_id=$2 AND question<>'' ORDER BY created_at DESC,id DESC LIMIT 8",[req.user.id,pet.id])).rows.reverse();
+    const notes=await notesFor(pet.id,false,topics.length?topics:null), result=await ai.answer({pet,agent,notes:notes.slice(0,30),question,history});
     // Re-read after slow inference: withdrawn/corrected material must not escape in a late answer.
     const active=await notesFor(pet.id,false,topics.length?topics:null), activeIds=new Set(active.map(n=>n.id));
     assert(notes.slice(0,30).every(n=>activeIds.has(n.id)),409,'KNOWLEDGE_CHANGED_RETRY');

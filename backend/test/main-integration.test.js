@@ -1,0 +1,118 @@
+// Actual frontend API adapters -> Fastify routes -> isolated PostgreSQL engine.
+// AI and object storage are substitutes; this does not certify cloud or devices.
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {PGlite} from '@electric-sql/pglite';
+import {createApp} from '../src/app.js';
+import {migrate} from '../src/db.js';
+import {provision} from '../src/auth.js';
+import {createPawletterClient} from '../../frontend/dist/pawletter-api.js';
+import {createAdopterAccount} from '../../frontend/dist/adopter-account.js';
+import {createObservationSender} from '../../frontend/dist/online-flow.js';
+
+test('main adapters connect registration, station archives, public facts, applications and station followups', async t=>{
+ const engine=new PGlite();
+ const query=(sql,params)=>sql.includes('CREATE TABLE')?engine.exec(sql):engine.query(sql,params);
+ const db={query,connect:async()=>({query,release(){}})};
+ await migrate(db);
+ const password='isolated-integration-12345';
+ await provision(db,{username:'main-station',password,role:'station',stationId:'main-station',stationName:'隔离测试站'});
+ const blobs=new Map(),contexts=[];
+ const ai={
+  extract:async text=>[{topic:'habits',quote:text,certainty:'ongoing'}],
+  answer:async context=>{contexts.push(context);return {answer:'我喜欢安静休息。',citationIds:context.notes.map(n=>n.id)};}
+ };
+ const app=await createApp({db,ai,storage:{put:async(k,v)=>blobs.set(k,v),read:async k=>blobs.get(k),remove:async k=>blobs.delete(k)},origin:'https://pawletter-adoption-h5.chenaaron668.chatgpt.site',additionalOrigins:'https://pawletter-preview.g1251020624.chatgpt.site'});
+ t.after(async()=>{await app.close();await engine.close();});
+ const requests=[];
+ const fetcher=origin=>async(url,options={})=>{
+  const u=new URL(url);requests.push(options.method+' '+u.pathname);
+  const r=await app.inject({url:u.pathname+u.search,method:options.method||'GET',headers:{origin,...options.headers},...(options.body===undefined?{}:{payload:options.body instanceof Blob?Buffer.from(await options.body.arrayBuffer()):options.body})});
+  return new Response(r.rawPayload,{status:r.statusCode,headers:r.headers});
+ };
+ const storage=new Map(),adopter=createAdopterAccount(fetcher('https://pawletter-preview.g1251020624.chatgpt.site'),{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)});
+ const station=createPawletterClient('https://pawletter-api-446222711695.asia-east1.run.app',fetcher('https://pawletter-adoption-h5.chenaaron668.chatgpt.site'));
+ const analysis={title:'稳定陪伴',summary:'愿意了解和照护。',highlights:['规律作息'],recommendations:[{type:'成年猫',reason:'偏好安静陪伴',basedOn:['expectation']}],unknowns:['经验待了解']};
+ const lifestyle={answers:{work:{text:'朝九晚六',value:'long'},routine:{text:'规律',value:'regular'},free:{text:'每天一小时',value:'one2'},expectation:{text:'安静陪伴',value:'quiet'}},analysis};
+ const profile=await adopter.register({username:'main-adopter',password,nickname:'隔离申请人',realName:'测试',phone:'13800000000',wechat:'qa-only',email:'qa@example.invalid',privacy:true,covenant:true,lifestyle},randomUUID());
+ assert.equal(profile.verification,'pending');
+ assert.equal((await adopter.profile()).phone,'13800000000');
+ await adopter.preferences(false);assert.equal((await adopter.profile()).consent,false);
+ await adopter.saveLifestyle(lifestyle);
+ await station.login('main-station',password);
+ const stationLogin=(await app.inject({method:'POST',url:'/v1/auth/login',payload:{username:'main-station',password}})).json();
+ assert.equal((await station.stations()).stations.length,1);
+ const commit={name:'测试伙伴',profile:{species:'cat',character:'安静',description:'喜欢休息。'},published:false,text:'口述',ocrText:'私有材料',photos:[],notes:[{topic:'health',quote:'疫苗日期待确认。',certainty:'pending',shared:true},{topic:'other',quote:'仅供本站查看。',certainty:'observation',shared:false}]};
+ const key=randomUUID(),pet=await station.commitIntake(commit,key);
+ assert.equal((await station.commitIntake(commit,key)).id,pet.id);
+ assert.equal((await station.knowledge(pet.id)).notes.length,2);
+ await assert.rejects(()=>adopter.facts(pet.id),e=>e.status===404);
+ await station.setVisibility(pet.id,true);
+ assert.ok((await adopter.catalog()).pets.some(p=>p.id===pet.id));
+ assert.deepEqual((await adopter.facts(pet.id)).notes.map(n=>n.quote),['疫苗日期待确认。']);
+ await station.updateAgent(pet.id,{tone:'calm',style:'简短自然'});
+ assert.equal((await station.agent(pet.id)).voice.tone,'calm');
+ const sender=createObservationSender(station),text='平时喜欢在窗边安静休息。';
+ const observation=await sender.send({petId:pet.id,text,shareWithAgent:true,observedOn:'2026-10-23'});
+ assert.equal((await station.processObservation(observation.id)).processed,true);
+ const records=(await station.observations(pet.id,{q:'窗边',from:'2026-10-23',to:'2026-10-23',status:'archived'})).observations;
+ assert.equal(records.length,1);assert.equal(records[0].observed_on,'2026-10-23');
+ assert.ok((await adopter.facts(pet.id)).notes.some(n=>n.quote===text));
+ await adopter.chat(pet.id,'你有什么习惯？');
+ assert.ok(contexts.at(-1).notes.some(n=>n.quote===text));
+ assert.ok(contexts.at(-1).notes.every(n=>n.quote!=='仅供本站查看。'));
+ assert.deepEqual(contexts.at(-1).history,[]);
+ await adopter.chat(pet.id,'我白天上班，晚上陪你行吗？');
+ assert.deepEqual(contexts.at(-1).history,[{question:'你有什么习惯？'}]);
+ const stationHistory=await app.inject({url:'/v1/pets/'+pet.id+'/chat',headers:{authorization:'Bearer '+stationLogin.token}});
+ assert.deepEqual(stationHistory.json().messages,[]);
+ const stationConversations=await app.inject({url:'/v1/conversations',headers:{authorization:'Bearer '+stationLogin.token}});
+ assert.equal(stationConversations.statusCode,200);assert.deepEqual(stationConversations.json().conversations,[]);
+ const deniedRead=await app.inject({method:'POST',url:'/v1/pets/'+pet.id+'/chat/read',headers:{authorization:'Bearer '+stationLogin.token},payload:{through:new Date().toISOString()}});
+ assert.equal(deniedRead.statusCode,404);
+ // Production PostgreSQL retains microseconds; JSON dates use milliseconds.
+ await db.query("UPDATE chats SET created_at=date_trunc('milliseconds',created_at)+interval '123 microseconds' WHERE user_id=$1",[profile.id]);
+ let conversations=(await adopter.conversations()).conversations;
+ assert.equal(conversations.length,1);assert.equal(conversations[0].unread,2);
+ assert.equal(conversations[0].pet.name,'测试伙伴');
+ const through=conversations[0].lastMessage.at;
+ await adopter.readConversation(pet.id,new Date(through).toISOString());
+ assert.equal((await adopter.conversations()).conversations[0].unread,0);
+ await adopter.chat(pet.id,'刚才说的晚上呢？');
+ await adopter.readConversation(pet.id,new Date(through).toISOString());
+ assert.equal((await adopter.conversations()).conversations[0].unread,1);
+ assert.ok(contexts.at(-1).history.every(row=>Object.keys(row).join()==='question'));
+ const replacement=await sender.send({petId:pet.id,text:'平时喜欢在垫子上休息。',shareWithAgent:true,replacesId:observation.id});
+ await station.processObservation(replacement.id);
+ assert.ok((await adopter.facts(pet.id)).notes.every(n=>n.quote!==text));
+ await station.withdrawObservation(replacement.id);
+ assert.deepEqual((await adopter.facts(pet.id)).notes.map(n=>n.quote),['疫苗日期待确认。']);
+ await adopter.chat(pet.id,'你现在有什么习惯？');
+ assert.ok(contexts.at(-1).notes.every(n=>n.quote!==text));
+ const applyBody={note:'家里已封窗，希望先见面。',memories:[],shareProfile:true},applyKey=randomUUID();
+ let application=await adopter.apply(pet.id,applyBody,applyKey);
+ assert.equal((await adopter.apply(pet.id,applyBody,applyKey)).id,application.id);
+ assert.equal((await station.applications()).applications[0].snapshot.wechat,'qa-only');
+ await assert.rejects(()=>adopter.applicationStage(application.id,1,application.version),e=>e.status===403);
+ application=await station.applicationStage(application.id,1,application.version);
+ assert.equal((await adopter.applications()).applications[0].stage,1);
+ application=await station.applicationStage(application.id,2,application.version);
+ await assert.rejects(()=>station.applicationStage(application.id,3,application.version),e=>e.message==='IDENTITY_PENDING');
+ // Fixture only: there is no product identity-verification endpoint yet.
+ await db.query("UPDATE adopter_profiles SET verification='verified' WHERE user_id=$1",[profile.id]);
+ application=await station.applicationStage(application.id,3,application.version);
+ assert.equal(application.stage,3);
+ assert.ok((await adopter.history(pet.id)).messages.some(m=>m.text.includes('交接完成')));
+ const follow=await station.createFollowup({applicationId:application.id,dueAt:'2026-11-01T02:00:00.000Z',note:'隔离测试回访'},randomUUID());
+ const updated=await station.updateFollowup(follow.id,{status:'completed',note:'仅站内记录，本测试不代表领养者回传。',dueAt:follow.dueAt,version:follow.version,requestId:randomUUID()});
+ assert.equal(updated.status,'completed');assert.equal((await station.followups()).followups[0].status,'completed');
+ await station.setVisibility(pet.id,false);await assert.rejects(()=>adopter.facts(pet.id),e=>e.status===404);
+ assert.equal((await adopter.applications()).applications[0].pet.name,'测试伙伴');
+ assert.ok((await adopter.history(pet.id)).messages.length>0);
+ assert.equal((await adopter.conversations()).conversations[0].canChat,false);
+ await assert.rejects(()=>adopter.chat(pet.id,'下架后不可新增聊天'),e=>e.status===404);
+ await adopter.logout();await assert.rejects(()=>adopter.profile(),e=>e.status===401);
+ await station.logout();await assert.rejects(()=>station.me(),e=>e.status===401);
+ assert.ok(requests.length>40);
+});

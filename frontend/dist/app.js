@@ -25,6 +25,7 @@ let lifestyleStep=0,lifestyleText='',lifestyleValue='unknown',lifestyleReview=fa
 const lifestyleOwner=()=>state.account||state.registrationDraft;
 const accountApi=exampleMode?createExampleAccount(()=>state):createAdopterAccount();
 let authRestoring=accountApi.hasSession(),authBusy=false,registrationCredentials=null,registrationKey=null,pendingAction=null;
+let interviewVoiceOpen=false;
 let interviewEpoch=0,interviewTurns=[],interviewAnalysis=null,applicationNote='';
 let applicationReview=false,applicationKey=null,applicationBusy=false,applicationError='';
 let catalogRows=[],catalogBusy=true,catalogError='',chatBusy=false,chatError='',chatEpoch=0;
@@ -367,6 +368,7 @@ function updateVoiceUI(){
  const v=voiceChat?.state;if(!v)return;
  const mic=document.querySelector('#interview-hold')||document.querySelector('#application-hold');
  const live=document.querySelector('#interview-live')||document.querySelector('#application-live');
+ const toggle=document.querySelector('[data-action=interview-voice-toggle]');if(toggle)toggle.disabled=v.holding||v.finishing||lifestyleSpeechBusy||capture.media.voicePending;
  if(mic){mic.disabled=v.finishing||lifestyleSpeechBusy;mic.classList.toggle('recording',v.holding);mic.classList.toggle('cancelling',v.cancelling);const span=mic.querySelector('span');if(span)span.textContent=v.finishing?'正在处理…':v.cancelling?'松手取消':capture.media.voicePending?'允许麦克风后继续按住':v.holding?(capture.media.voiceRecorder?'松手发送 · '+capture.media.audioSeconds+' 秒':'正在打开麦克风…'):'按住说话';}
  if(live&&v.holding)live.textContent=v.cancelling?'这段不会发送':v.live|| (v.realtime?'正在听你说…':'正在录音，松手后转写…');
 }
@@ -379,7 +381,7 @@ function loadLifestyleStep(index){
 function startLifestyle(){
  resetLifestyleSpeech();const owner=lifestyleOwner();if(!owner){registrationGate('lifestyle');return;}
  owner.lifestyleDraft??=structuredClone(owner.lifestyle?.answers||{});lifestyleViewing=!!owner.lifestyle;lifestyleReview=lifestyleViewing;
- interviewAnalysis=owner.lifestyle?.analysis||null;lifestyleStep=0;lifestyleText='';interviewTurns=[];capture.reset();navigate('lifestyle');
+ interviewAnalysis=owner.lifestyle?.analysis||null;lifestyleStep=0;lifestyleText='';interviewTurns=[];interviewVoiceOpen=false;capture.reset();navigate('lifestyle');
 }
 async function transcribeLifestyle(){
  if(exampleMode){toast('示例访谈使用预设回答；真实语音请返回正式界面体验。');return;}
@@ -423,7 +425,7 @@ async function confirmAccount(){
 }
 function lifestylePage(){
  if(!lifestyleOwner())return '';
- return interviewView({topbar,esc,icon,button,questions:lifestyleQuestions,answers:lifestyleViewing?state.account.lifestyle.answers:lifestyleOwner().lifestyleDraft,analysis:interviewAnalysis,step:lifestyleStep,review:lifestyleReview,viewing:lifestyleViewing,registering:!state.account,busy:lifestyleSpeechBusy||authBusy,error:lifestyleSpeechError,turns:interviewTurns,text:lifestyleText,audioUrl:capture.media.audioUrl});
+ return interviewView({topbar,esc,icon,button,questions:lifestyleQuestions,answers:lifestyleViewing?state.account.lifestyle.answers:lifestyleOwner().lifestyleDraft,analysis:interviewAnalysis,step:lifestyleStep,review:lifestyleReview,viewing:lifestyleViewing,registering:!state.account,busy:lifestyleSpeechBusy||authBusy,error:lifestyleSpeechError,turns:interviewTurns,voiceOpen:interviewVoiceOpen,text:lifestyleText,audioUrl:capture.media.audioUrl});
 }
 
 function applyPage(){
@@ -876,6 +878,7 @@ document.addEventListener('click',async event=>{
       registrationReturn=null;save();navigate('register');break;
     }
     case 'lifestyle':startLifestyle();break;
+    case 'interview-voice-toggle':if(lifestyleSpeechBusy||voiceChat.state.holding||voiceChat.state.finishing||capture.media.voicePending)break;interviewVoiceOpen=!interviewVoiceOpen;render();document.querySelector(interviewVoiceOpen?'[data-action=interview-voice-toggle]':'#lifestyle-answer')?.focus();break;
     case 'lifestyle-restart':lifestyleOwner().lifestyleDraft=structuredClone(lifestyleOwner().lifestyle?.answers||{});interviewAnalysis=null;loadLifestyleStep(0);break;
     case 'lifestyle-transcribe':await transcribeLifestyle();break;
     case 'lifestyle-summary':await summarizeLifestyle();break;

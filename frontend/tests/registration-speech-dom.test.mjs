@@ -13,7 +13,14 @@ test('hold release transcribes, slide up cancels, busy preserves recording and r
  try{
   await import('../dist/app.js');document.querySelector('[data-action=nav][data-value=mine]').click();document.querySelector('[data-action=register]').click();
   const form=document.querySelector('#register-form');for(const [k,v] of Object.entries({nickname:'测试',username:'tester',password:'password-test-123',realName:'验收用户',phone:'13800000000'}))form.elements[k].value=v;form.elements.covenant.checked=true;form.elements.privacy.checked=true;form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
+  const toggle=()=>document.querySelector('[data-action=interview-voice-toggle]');
+  assert.ok(document.querySelector('#interview-voice-panel').hidden);assert.equal(toggle().closest('form').id,'lifestyle-answer-form');
+  const draft=document.querySelector('#lifestyle-answer');draft.value='待发送文字';draft.dispatchEvent(new window.Event('input',{bubbles:true}));
+  toggle().click();assert.equal(toggle().getAttribute('aria-expanded'),'true');assert.equal(document.querySelector('#interview-voice-panel').hidden,false);assert.equal(posts,0);
+  toggle().click();assert.ok(document.querySelector('#interview-voice-panel').hidden);assert.equal(document.querySelector('#lifestyle-answer').value,'待发送文字');
+  toggle().click();
   pointer(document.querySelector('#interview-hold'),'pointerdown',300);await until(()=>document.querySelector('#interview-hold').textContent.includes('秒'));
+  assert.ok(toggle().disabled);
   pointer(document,'pointermove',200);assert.match(document.querySelector('#interview-hold').textContent,/取消/);pointer(document,'pointerup',200);await until(()=>!document.querySelector('#interview-hold').disabled);assert.equal(posts,0);
   pointer(document.querySelector('#interview-hold'),'pointerdown',300);await until(()=>document.querySelector('#interview-hold').textContent.includes('秒'));pointer(document,'pointerup',300);try{await until(()=>posts===1);}catch(e){console.log({posts,body:document.querySelector('.interview-composer').textContent});throw e;}
   finish({ok:false,status:429,json:async()=>({error:'SPEECH_PROVIDER_BUSY'})});await until(()=>document.querySelector('[data-action=lifestyle-transcribe]'));

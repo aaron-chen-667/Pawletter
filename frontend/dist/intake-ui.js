@@ -1,3 +1,4 @@
+import {escapeDisplay} from './display-text.js';
 import {imageData,videoData,toDataURL} from './intake-media.js';
 import {createCaptureController} from './capture.js';
 import {createPressToTalk} from './press-to-talk.js';
@@ -74,11 +75,11 @@ export function createIntakeUI({api,exampleMode,root,redraw,onDone,canWrite=()=>
   return `<div class="intake-bubble me media">${items.map(m=>`<button type="button" class="intake-bubble-media" data-intake="preview" data-id="${esc(m.id)}" aria-label="查看${esc(m.name||'素材')}">${m.kind==='document'?`<span class="intake-document-icon">${icons.file}</span><span>${esc(m.name||'材料')}</span>`:`<img src="${esc(m.kind==='video'?m.frames?.[0]:m.dataUrl)}" alt="${m.kind==='video'?'视频封面':'伙伴照片'}">${m.kind==='video'?'<span class="intake-video-mark">▶</span>':''}`}</button>`).join('')}</div>`;
  }
  function turnView(t,last){
-  if(t.role==='ai')return `<div class="intake-bubble ai">${esc(t.text)}</div>${last&&t.dimension&&!s.commit?button('暂时不清楚','decline','intake-decline'):''}`;
+  if(t.role==='ai')return `<div class="intake-bubble ai">${escapeDisplay(t.text)}</div>${last&&t.dimension&&!s.commit?button('暂时不清楚','decline','intake-decline'):''}`;
   if(t.mediaIds)return mediaBubble(t);
   if(t.kind==='decline')return `<div class="intake-bubble me">暂时不清楚</div>`;
   if(s.editing===t.id)return `<form class="intake-bubble me editing" data-edit="${esc(t.id)}"><textarea id="intake-edit" rows="3" maxlength="${maxText}" aria-label="修改这条回答">${esc(t.text)}</textarea><div><button type="button" class="text-button" data-intake="cancel-edit">取消</button><button class="text-button strong">保存</button></div></form>`;
-  return `<button type="button" class="intake-bubble me" data-intake="edit" data-id="${esc(t.id)}" aria-label="修改：${esc(t.text)}" ${locked()||s.commit?'disabled':''}>${esc(t.text)}</button>`;
+  return `<button type="button" class="intake-bubble me" data-intake="edit" data-id="${esc(t.id)}" aria-label="修改：${esc(t.text)}" ${locked()||s.commit?'disabled':''}>${escapeDisplay(t.text)}</button>`;
  }
  function cardView(){
   const r=s.review;if(!r&&!s.commit)return '';

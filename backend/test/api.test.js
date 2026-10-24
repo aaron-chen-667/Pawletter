@@ -26,7 +26,7 @@ before(async()=>{
  await provision(db,{username:'station-one',password:'testing-password-one',role:'station',stationId:'s1',stationName:'暖爪救助站'});
  await provision(db,{username:'station-two',password:'testing-password-two',role:'station',stationId:'s2',stationName:'小院猫咪之家'});
  await provision(db,{username:'adopter-one',password:'testing-password-three',role:'adopter'});
- app=await createApp({db,ai,storage});
+ app=await createApp({db,ai,storage,origin:'https://pawletter-adoption-h5.chenaaron668.chatgpt.site, https://pawletter-preview.g1251020624.chatgpt.site/'});
  async function signIn(username,password){const r=await app.inject({method:'POST',url:'/v1/auth/login',payload:{username,password}});assert.equal(r.statusCode,200,r.body);return r.json().token;}
  station=await signIn('station-one','testing-password-one');other=await signIn('station-two','testing-password-two');adopter=await signIn('adopter-one','testing-password-three');
  for(const published of [true,false]){const r=await request(station,'POST','/v1/pets',{name:'吐司',profile:{species:'cat'},published});assert.equal(r.statusCode,201,r.body);if(published)pet=r.json().id;else privatePet=r.json().id;}
@@ -78,6 +78,22 @@ test('anonymous onboarding speech validates audio and origin, limits shared spen
  assert.equal(transcribeCalls,before+1);
  await db.query('DELETE FROM onboarding_speech_budget');
  transcribeCalls=before;
+});
+test('collaborator CORS and speech share an exact origin allowlist',async()=>{
+ const preview='https://pawletter-preview.g1251020624.chatgpt.site';
+ for(const origin of ['https://pawletter-adoption-h5.chenaaron668.chatgpt.site',preview]){
+  const result=await app.inject({method:'OPTIONS',url:'/v1/pets',headers:{origin,'access-control-request-method':'POST','access-control-request-headers':'authorization,content-type,idempotency-key'}});
+  assert.equal(result.statusCode,204);assert.equal(result.headers['access-control-allow-origin'],origin);
+  assert.match(result.headers['access-control-allow-headers'],/Authorization/);
+  const speech=await app.inject({method:'POST',url:'/v1/onboarding/transcribe',remoteAddress:'192.0.2.10',headers:{origin,'content-type':'audio/wav'},payload:Buffer.from('invalid')});
+  assert.equal(speech.statusCode,400);assert.equal(speech.json().error,'INVALID_AUDIO_FILE');
+ }
+ for(const origin of ['https://wrong.invalid',preview+'.evil.invalid','http://pawletter-preview.g1251020624.chatgpt.site','null']){
+  const result=await app.inject({method:'OPTIONS',url:'/v1/pets',headers:{origin,'access-control-request-method':'POST'}});
+  assert.equal(result.headers['access-control-allow-origin'],undefined);
+  const speech=await app.inject({method:'POST',url:'/v1/onboarding/transcribe',remoteAddress:'192.0.2.10',headers:{origin,'content-type':'audio/wav'},payload:Buffer.from('invalid')});
+  assert.equal(speech.statusCode,403);assert.equal(speech.json().error,'ORIGIN_REQUIRED');
+ }
 });
 test('health, CORS and authenticated endpoints',async()=>{
  assert.equal((await app.inject('/health')).statusCode,200);

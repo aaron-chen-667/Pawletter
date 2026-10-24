@@ -35,7 +35,7 @@ test('online UI logs in with server role, records to correct pet, preserves corr
   click('[data-live=home]');await waitFor(()=>q('[data-live=pets]'));assert.equal(q('[data-live=pet]'),null);click('[data-live=pets]');await waitFor(()=>q('[data-live=pet]'));click('[data-live=pet]');await waitFor(()=>q('[data-live=chat]'));
   click('[data-live=chat]');fill('#chat-question','它喜欢被抱吗？');failChat=true;submit('#chat-form');
   await waitFor(()=>q('#live-error').textContent.includes('暂时'));assert.equal(q('#chat-question').value,'它喜欢被抱吗？');assert.equal(document.querySelectorAll('.chat-bubble').length,0);
-  failChat=false;submit('#chat-form');await waitFor(()=>q('.citation'));assert.equal(q('#chat-question').value,'');assert.match(q('.citation').textContent,/今天不愿被抱/);
+  failChat=false;submit('#chat-form');await waitFor(()=>document.querySelectorAll('.chat-bubble').length===2);assert.equal(q('#chat-question').value,'');assert.match(document.querySelectorAll('.chat-bubble')[1].textContent,/今天不愿被抱/);assert.equal(q('.citation'),null);
   click('[data-live=logout]');await waitFor(()=>q('#login-form'));assert.equal(window.localStorage.length,0);assert.doesNotMatch(q('#app').textContent,/今天不愿被抱/);
   role='adopter';fill('[name=username]','adopter');fill('[name=password]','not-a-real-password');submit('#login-form');await waitFor(()=>q('[data-live=pet]'));
   assert.equal(q('[data-live=new]'),null);assert.equal(q('[data-live=voice]'),null);click('[data-live=pet]');await waitFor(()=>q('[data-live=chat]'));assert.equal(q('[data-live=correct]'),null);

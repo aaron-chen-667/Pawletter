@@ -1,4 +1,5 @@
-export const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export {escapeDisplay as escapeHTML} from './display-text.js';
+import {escapeDisplay as escapeHTML} from './display-text.js';
 const e=escapeHTML;
 export const stageNames={'-1':'已结束',0:'待审核',1:'待见面',2:'待交接',3:'已完成'};
 export const followupNames={pending:'待回访',confirmation:'待确认',attention:'需关注',completed:'已完成'};

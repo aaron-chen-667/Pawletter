@@ -29,8 +29,17 @@ test('guest gate, real registration, private profile, default greeting and serve
   form.elements.covenant.checked=true;form.elements.privacy.checked=true;submit(form);
   assert.ok(document.querySelector('#lifestyle-answer-form'));assert.equal(document.querySelector('select'),null);assert.equal(document.querySelector('[data-action=lifestyle-sample]'),null);
   assert.equal(sessionStorage.getItem('pawletter.auth.v1'),null);
+  for(const text of ['hhhhh第一次','hhhhh第二次']){
+   const f=document.querySelector('#lifestyle-answer-form');f.elements.answer.value=text;submit(f);await until(()=>!document.querySelector('#lifestyle-answer')?.disabled);
+  }
+  const bubbles=()=>[...document.querySelectorAll('.interview-stream .interview-bubble')].map(el=>el.textContent);
+  assert.match(bubbles()[0],/上班|不在家/);
+  assert.deepEqual(bubbles().slice(1),['hhhhh第一次','谢谢你告诉我。','hhhhh第二次','谢谢你告诉我。']);
   for(const text of ['每天离家八小时','早七晚十一，作息规律','晚上可以陪伴两小时','想认识安静的成年猫']){
    const f=document.querySelector('#lifestyle-answer-form');f.elements.answer.value=text;submit(f);await until(()=>!document.querySelector('#lifestyle-answer')?.disabled);
+   if(text==='每天离家八小时'){
+    assert.equal(bubbles()[5],text);assert.equal(bubbles()[6],'谢谢你告诉我。');assert.equal(bubbles().length,8);
+   }
   }
   await until(()=>document.querySelector('[data-action=lifestyle-confirm]'));
   assert.match(document.querySelector('.persona-hero').textContent,/忙里忙外的小能手/);assert.match(document.querySelector('.persona-recommendation').textContent,/依据/);

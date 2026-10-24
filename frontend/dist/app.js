@@ -1,3 +1,4 @@
+import {escapeDisplay as esc} from './display-text.js';
 import { knowledgeTopics, observationEntries, confirmObservation, saveUnprocessedObservation, knowledgeReply } from './pet-knowledge.js';
 import { STORAGE_KEY, freshState, activePet, recommendations, extractMemory, mergeMemory, addMessage, greet, replyFor, reviewConversation, advanceApplication, summarizeFeedback, stages } from './domain.js';
 import { createCaptureController } from './capture.js';
@@ -14,6 +15,7 @@ import {loginView,interviewView} from './account-ui.js';
 import {createPressToTalk} from './press-to-talk.js';
 import {petJourneyMessage} from './pet-voice.js';
 import {cloudPet} from './cloud-pets.js';
+import {profileFactsView} from './profile-facts.js';
 import {petShareData,sharePet} from './pet-share.js';
 import {EXAMPLES_KEY,exampleAnswers,exampleScenes,createAdopterExamples,createExampleAccount} from './adopter-examples.js';
 const exampleMode=new URL(location.href).searchParams.get('examples')==='1';
@@ -24,10 +26,19 @@ let lifestyleStep=0,lifestyleText='',lifestyleValue='unknown',lifestyleReview=fa
 const lifestyleOwner=()=>state.account||state.registrationDraft;
 const accountApi=exampleMode?createExampleAccount(()=>state):createAdopterAccount();
 let authRestoring=accountApi.hasSession(),authBusy=false,registrationCredentials=null,registrationKey=null,pendingAction=null;
-let interviewEpoch=0,interviewReply='',interviewAnalysis=null,applicationNote='';
+let interviewVoiceOpen=false;
+let interviewEpoch=0,interviewTurns=[],interviewAnalysis=null,applicationNote='';
 let applicationReview=false,applicationKey=null,applicationBusy=false,applicationError='';
 let catalogRows=[],catalogBusy=true,catalogError='',chatBusy=false,chatError='',chatEpoch=0;
 let initialPetId=new URL(location.href).searchParams.get('pet');
+let profileFacts=null,factsEpoch=0;
+async function loadProfileFacts(){
+ const id=page.id;if(page.name!=='profile'||!activePet(state,id)?.cloud)return;
+ const epoch=++factsEpoch;profileFacts={status:'loading'};render();
+ try{const result=await accountApi.facts(id);if(epoch!==factsEpoch)return;profileFacts={status:'ready',notes:result.notes};}
+ catch{if(epoch!==factsEpoch)return;profileFacts={status:'error'};}
+ if(page.name==='profile'&&page.id===id)render();
+}
 let storyMode=exampleMode;
 function guestState(){const value=freshState();value.defaultExamplesRevision=1;value.memory=[];value.consent=true;initializeDiscovery(value);value.location.source='default';initializeCommunity(value);value.pets=catalogRows.map(cloudPet);value.role='user';return value;}
 let state=exampleMode?createAdopterExamples():guestState();
@@ -142,7 +153,6 @@ const icons = {
   stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',
 };
 function icon(name,cls='') { return `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="${name==='paw'?'currentColor':'none'}" stroke="${name==='paw'?'none':'currentColor'}" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.paw}</svg>`; }
-function esc(value='') { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function photo(p,cls='',extra='') { return `<img class="${cls}" src="${esc(p.image||'./assets/paw.svg')}" alt="${esc(p.name)}的照片" ${extra} />`; }
 function button(label,action,cls='button',value='',extra='') { return `<button class="${cls}" data-action="${action}" ${value?`data-value="${esc(value)}"`:''} ${extra}>${label}</button>`; }
 function save() {
@@ -163,8 +173,10 @@ function navigate(name,id) {
   if(page.name!==name||page.id!==id)navigationStack.push({...page});
   page={name,id}; overlay=null; render(); window.scrollTo({top:0,behavior:'instant'});
   if(name==='intake')capture.startCamera();
+  if(name==='profile')void loadProfileFacts();
 }
 function leaveCapture(next) {
+  factsEpoch++;profileFacts=null;
   if(['lifestyle','apply'].includes(page.name)&&next!==page.name){resetLifestyleSpeech();voiceChat.cancel();interviewEpoch++;}
   if(page.name==='voice'&&next!=='voice'&&captureIntent.kind==='observation'){observationHold=false;observationPetId=null;}
   if(page.name==='intake'&&next!=='intake')capture.stopCamera();
@@ -339,7 +351,7 @@ function profilePage() {
   const application=currentApplication(p.id);
   return `<div class="profile-photo">${photo(p)}<div class="profile-top">${button(icon('back'),'back','icon-button glass','','aria-label="返回"')}${button(icon('share'),'share-pet','icon-button glass',p.id,'aria-label="分享宠物"')}</div><span class="profile-label">救助者维护的宠物档案</span>${button(icon('heart'),'follow',`icon-button glass profile-like ${state.following.includes(p.id)?'saved':''}`,p.id,`aria-label="${state.following.includes(p.id)?'取消喜欢':'喜欢'}${esc(p.name)}" aria-pressed="${state.following.includes(p.id)}"`)}</div><main class="main profile-main"><div class="profile-name"><div><p class="eyebrow">NICE TO MEET YOU</p><h1>${esc(p.name)} <small>${p.sex==='男孩子'?'♂':p.sex==='女孩子'?'♀':''}</small></h1></div>${statusPill(p)}</div><p class="pet-meta">${[p.age,p.sex,p.coat,p.city].filter(Boolean).map(esc).join(' · ')}</p><p class="profile-quote">“${esc(p.mood)}”</p><div class="tags">${p.tags.map(t=>`<span>${esc(t)}</span>`).join('')}</div>
     ${sectionHeading('A LITTLE ABOUT ME','先认识，真实的我')}
-    <p class="body-copy">${esc(p.intro)}</p><div class="facts-card"><div><span>性格观察</span><p>${esc(p.character)}</p></div><div><span>健康记录</span><p>${esc(p.health)}</p></div><div><span>待确认</span><p>${esc(p.unknown)}</p></div><div><span>领养需要</span><p>${esc(p.needs)}</p></div></div>
+    <p class="body-copy">${esc(p.intro)}</p>${profileFactsView(p,profileFacts)}
     <button class="station-note station-card-link" data-action="station" data-value="${stationFor(p).id}"><span class="station-icon">${icon('home')}</span><div><strong>${esc(p.station)}</strong><p>看看是谁在照顾它 · 进入救助站主页</p></div>${icon('chevron')}</button>
     <p class="footnote">AI 分身只依据救助者档案介绍自己，不能实时感知动物状态。</p>
   </main><div class="sticky-actions">${button(icon('chat')+' 聊一聊','chat','button secondary',p.id)}${p.status==='adopted'?button('查看到家记录','followup','button primary',p.id):application?button('查看领养进度','progress','button primary',application.id):button('我想领养 '+icon('arrow'),'apply','button primary',p.id,p.status!=='available'?'disabled':'')}</div>`;
@@ -357,8 +369,8 @@ function chatPage() {
     : `<div class="chat-context">${photo(p,'mini-avatar')}<div><small>${esc(p.age)} · ${esc(p.tags[0])}</small><strong>聊得投缘，再认真了解它。</strong></div>${button('了解与领养','profile','context-button',p.id)}</div>`;
   return `<header class="topbar">${button(icon('back'),'back','icon-button','','aria-label="返回"')}<div class="topbar-title"><strong>${esc(p.name)} <span class="agent-tag">AI 分身</span></strong><small>${adopted?'已经成为家人，继续陪你记录日常':'慢慢认识彼此'}</small></div>${button(icon('more'),'chat-options','icon-button',p.id,'aria-label="对话设置"')}</header>${context}
     <div class="chat-stream" role="log" aria-label="聊天记录" aria-live="polite"><div class="chat-date">${state.sampleStory?'聊天记录':'今天 · 从一句你好开始'}</div>
-    ${messages.map(m=>`<div class="chat-message ${m.from==='user'?'outgoing':''}">${m.from==='pet'?photo(p,'chat-avatar'):`<span class="chat-avatar person">${esc((state.account?.nickname||'小禾').slice(0,1))}</span>`}<div class="bubble-wrap"><div class="bubble">${esc(m.text)}${m.citations?.length?`<small class="chat-citation">${m.citations.map(c=>esc(c.station)+' · '+esc(c.quote)).join('<br>')}</small>`:''}</div>${m.reasons?`<small class="bubble-reason">${icon('spark')} ${esc(m.reasons.join(' · '))}</small>`:''}${m.memory?`<button class="memory-inline" data-action="memory">${icon('book')} 已记住你的偏好 · 查看或修改</button>`:''}${m.intent&&!adopted?button('了解领养条件 '+icon('arrow'),'apply','bubble-action',p.id):''}</div></div>`).join('')}
-    </div><div class="chat-bottom">${chatBusy?'<p role="status" class="chat-loading">正在翻阅我的档案…</p>':''}${chatError?`<p role="alert" class="chat-error">${esc(chatError)}</p>`:''}<div class="chat-suggestions">${suggestions.map(t=>button(t,'suggestion','suggestion',t)).join('')}</div><form id="chat-form" class="chat-compose"><label class="sr-only" for="chat-input">发送消息</label><input id="chat-input" name="message" placeholder="${adopted?'聊聊你们今天的日常…':'说点什么，慢慢认识它…'}" autocomplete="off" maxlength="500" required /><button class="send-button" type="submit" aria-label="发送消息" ${chatBusy?'disabled':''}>${icon('send')}</button></form></div>`;
+    ${messages.map(m=>`<div class="chat-message ${m.from==='user'?'outgoing':''}">${m.from==='pet'?photo(p,'chat-avatar'):`<span class="chat-avatar person">${esc((state.account?.nickname||'小禾').slice(0,1))}</span>`}<div class="bubble-wrap"><div class="bubble">${esc(m.text)}</div>${m.reasons?`<small class="bubble-reason">${icon('spark')} ${esc(m.reasons.join(' · '))}</small>`:''}${m.memory?`<button class="memory-inline" data-action="memory">${icon('book')} 已记住你的偏好 · 查看或修改</button>`:''}${m.intent&&!adopted?button('了解领养条件 '+icon('arrow'),'apply','bubble-action',p.id):''}</div></div>`).join('')}
+    </div><div class="chat-bottom">${chatBusy?'<p role="status" class="chat-loading">正在翻阅宠物的档案…</p>':''}${chatError?`<p role="alert" class="chat-error">${esc(chatError)}</p>`:''}<div class="chat-suggestions">${suggestions.map(t=>button(t,'suggestion','suggestion',t)).join('')}</div><form id="chat-form" class="chat-compose"><label class="sr-only" for="chat-input">发送消息</label><input id="chat-input" name="message" placeholder="${adopted?'聊聊你们今天的日常…':'说点什么，慢慢认识它…'}" autocomplete="off" maxlength="500" required /><button class="send-button" type="submit" aria-label="发送消息" ${chatBusy?'disabled':''}>${icon('send')}</button></form></div>`;
 }
 function memoryPage() {
   return `${topbar('我的偏好与记忆','让每一次推荐，更懂你的生活')}<main class="main"><div class="memory-hero">${icon('book')}<h1>喜欢，可以慢慢清晰。</h1><p>记住你明确说过的事。<br>也留给你随时改变的自由。</p></div><div class="memory-list">${state.memory.map(m=>`<div class="memory-item"><span class="memory-type">${m.type==='condition'?'生活条件':'我的偏好'}</span><strong>${esc(m.text)}</strong><small>${esc(m.source)}</small><div>${button(icon('edit'),'edit-memory','icon-button',m.id,'aria-label="编辑记忆"')}${button(icon('trash'),'delete-memory','icon-button',m.id,'aria-label="删除记忆"')}</div></div>`).join('')||empty('从一句喜欢开始','聊天中明确表达的偏好会出现在这里。')}</div>${button(icon('plus')+' 补充一条记忆','add-memory','button secondary full')}<p class="footnote">修改会影响下一轮推荐，不会修改动物档案。删除后不再参与匹配；重新明确表达时可再次记住。</p>${button('看看现在更适合谁 '+icon('arrow'),'nav','button primary full','meet')}</main>`;
@@ -367,6 +379,7 @@ function updateVoiceUI(){
  const v=voiceChat?.state;if(!v)return;
  const mic=document.querySelector('#interview-hold')||document.querySelector('#application-hold');
  const live=document.querySelector('#interview-live')||document.querySelector('#application-live');
+ const toggle=document.querySelector('[data-action=interview-voice-toggle]');if(toggle)toggle.disabled=v.holding||v.finishing||lifestyleSpeechBusy||capture.media.voicePending;
  if(mic){mic.disabled=v.finishing||lifestyleSpeechBusy;mic.classList.toggle('recording',v.holding);mic.classList.toggle('cancelling',v.cancelling);const span=mic.querySelector('span');if(span)span.textContent=v.finishing?'正在处理…':v.cancelling?'松手取消':capture.media.voicePending?'允许麦克风后继续按住':v.holding?(capture.media.voiceRecorder?'松手发送 · '+capture.media.audioSeconds+' 秒':'正在打开麦克风…'):'按住说话';}
  if(live&&v.holding)live.textContent=v.cancelling?'这段不会发送':v.live|| (v.realtime?'正在听你说…':'正在录音，松手后转写…');
 }
@@ -374,12 +387,12 @@ const voiceChat=createPressToTalk({capture,onChange:updateVoiceUI,onSend:async(u
 function resetLifestyleSpeech(){lifestyleSpeech.cancel();lifestyleSpeechBusy=false;lifestyleSpeechError='';}
 function loadLifestyleStep(index){
  if(!Number.isInteger(index)||index<0||index>=4)return;
- resetLifestyleSpeech();voiceChat.cancel();interviewEpoch++;capture.reset();lifestyleStep=index;lifestyleReview=false;lifestyleViewing=false;interviewAnalysis=null;interviewReply='';lifestyleText='';render();
+ resetLifestyleSpeech();voiceChat.cancel();interviewEpoch++;capture.reset();lifestyleStep=index;lifestyleReview=false;lifestyleViewing=false;interviewAnalysis=null;interviewTurns=interviewTurns.filter(turn=>turn.step<index);lifestyleText='';render();
 }
 function startLifestyle(){
  resetLifestyleSpeech();const owner=lifestyleOwner();if(!owner){registrationGate('lifestyle');return;}
  owner.lifestyleDraft??=structuredClone(owner.lifestyle?.answers||{});lifestyleViewing=!!owner.lifestyle;lifestyleReview=lifestyleViewing;
- interviewAnalysis=owner.lifestyle?.analysis||null;lifestyleStep=0;lifestyleText='';interviewReply='';capture.reset();navigate('lifestyle');
+ interviewAnalysis=owner.lifestyle?.analysis||null;lifestyleStep=0;lifestyleText='';interviewTurns=[];interviewVoiceOpen=false;capture.reset();navigate('lifestyle');
 }
 async function transcribeLifestyle(){
  if(exampleMode){toast('示例访谈使用预设回答；真实语音请返回正式界面体验。');return;}
@@ -393,15 +406,15 @@ async function transcribeLifestyle(){
 async function sendInterviewAnswer(text){
  if(lifestyleSpeechBusy||capture.media.voiceRecorder||capture.media.voicePending||!text.trim()||!lifestyleOwner())return;
  if(text.length>2000){toast('请控制在 2000 字以内。');return;}
- const epoch=interviewEpoch;lifestyleText=text;lifestyleSpeechBusy=true;lifestyleSpeechError='';render();
+ const epoch=interviewEpoch;const turn={step:lifestyleStep,text,reply:''};interviewTurns.push(turn);lifestyleText='';lifestyleSpeechBusy=true;lifestyleSpeechError='';render();
  try{
    const response=await accountApi.interview(lifestyleQuestions[lifestyleStep].key,text);if(epoch!==interviewEpoch)return;
-   interviewReply=response.reply;
+   turn.reply=response.reply;
    if(!response.understood){lifestyleSpeechBusy=false;render();return;}
    lifestyleOwner().lifestyleDraft[lifestyleQuestions[lifestyleStep].key]={text,value:response.value};lifestyleText='';await capture.reset();
    lifestyleSpeechBusy=false;
    if(lifestyleStep<3){lifestyleStep++;render();}else await summarizeLifestyle();
- }catch(e){if(epoch===interviewEpoch){lifestyleSpeechError=e.message;lifestyleSpeechBusy=false;render();}}
+ }catch(e){if(epoch===interviewEpoch){lifestyleText=text;lifestyleSpeechError=e.message;lifestyleSpeechBusy=false;render();}}
 }
 async function summarizeLifestyle(){
  const owner=lifestyleOwner();if(!owner||lifestyleSpeechBusy)return;
@@ -423,7 +436,7 @@ async function confirmAccount(){
 }
 function lifestylePage(){
  if(!lifestyleOwner())return '';
- return interviewView({topbar,esc,icon,button,questions:lifestyleQuestions,answers:lifestyleViewing?state.account.lifestyle.answers:lifestyleOwner().lifestyleDraft,analysis:interviewAnalysis,step:lifestyleStep,review:lifestyleReview,viewing:lifestyleViewing,registering:!state.account,busy:lifestyleSpeechBusy||authBusy,error:lifestyleSpeechError,reply:interviewReply,text:lifestyleText,audioUrl:capture.media.audioUrl});
+ return interviewView({topbar,esc,icon,button,questions:lifestyleQuestions,answers:lifestyleViewing?state.account.lifestyle.answers:lifestyleOwner().lifestyleDraft,analysis:interviewAnalysis,step:lifestyleStep,review:lifestyleReview,viewing:lifestyleViewing,registering:!state.account,busy:lifestyleSpeechBusy||authBusy,error:lifestyleSpeechError,turns:interviewTurns,voiceOpen:interviewVoiceOpen,text:lifestyleText,audioUrl:capture.media.audioUrl});
 }
 
 function applyPage(){
@@ -777,6 +790,7 @@ document.addEventListener('click',async event=>{
     }
     case 'application-edit':applicationReview=false;render();break;
     case 'catalog-retry':await loadCatalog();break;
+    case 'facts-retry':await loadProfileFacts();break;
     case 'nav':navigate(value);break;
     case 'identity':openOverlay('identity');break;
     case 'identity-adopter':overlay=null;state.role='user';save();render();break;
@@ -816,7 +830,7 @@ document.addEventListener('click',async event=>{
     case 'station':navigate('station',value);break;
     case 'unpublish-moment':{if(state.role!=='user')break;const f=state.followups.find(f=>f.id===value&&f.adopterId===state.account?.id);if(f){f.publication={...f.publication,allowed:false,withdrawnAt:Date.now()};save();render();toast('已撤下主页展示，站点回访记录保留');}break;}
     case 'rating-appeal':{const r=state.ratings.find(r=>r.id===value&&r.adopterId===state.account?.id);if(r){r.appeal={at:Date.now()};save();render();toast('复核请求已在本地记录，等待站点核实');}break;}
-    case 'back':{const next=navigationStack.pop()||{name:state.role==='rescue'?'work':'meet'};leaveCapture(next.name);page=next;overlay=null;render();window.scrollTo(0,0);if(page.name==='intake')capture.startCamera();break;}
+    case 'back':{const next=navigationStack.pop()||{name:state.role==='rescue'?'work':'meet'};leaveCapture(next.name);page=next;overlay=null;render();window.scrollTo(0,0);if(page.name==='intake')capture.startCamera();if(page.name==='profile')void loadProfileFacts();break;}
     case 'filter':filter=value;render();break;
     case 'location':openOverlay('location');break;
     case 'locate':locateUser();break;
@@ -876,6 +890,7 @@ document.addEventListener('click',async event=>{
       registrationReturn=null;save();navigate('register');break;
     }
     case 'lifestyle':startLifestyle();break;
+    case 'interview-voice-toggle':if(lifestyleSpeechBusy||voiceChat.state.holding||voiceChat.state.finishing||capture.media.voicePending)break;interviewVoiceOpen=!interviewVoiceOpen;render();document.querySelector(interviewVoiceOpen?'[data-action=interview-voice-toggle]':'#lifestyle-answer')?.focus();break;
     case 'lifestyle-restart':lifestyleOwner().lifestyleDraft=structuredClone(lifestyleOwner().lifestyle?.answers||{});interviewAnalysis=null;loadLifestyleStep(0);break;
     case 'lifestyle-transcribe':await transcribeLifestyle();break;
     case 'lifestyle-summary':await summarizeLifestyle();break;

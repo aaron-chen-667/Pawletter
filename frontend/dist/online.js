@@ -24,7 +24,13 @@ let intakeDetails={};
 let agentVoice={tone:'gentle',style:''};
 let newDraft={name:'',species:'cat',description:'',published:false};
 let captureResetting=false;
-const intake=createIntakeUI({api,exampleMode,root,redraw:render,onDone:async result=>{intake.stop();pets=(await api.pets()).pets;await go('pet',result.id);notice='档案已建立，已确认的观察正在整理。';if(result.observationId)void api.processObservation(result.observationId).then(()=>refreshDetail()).catch(()=>{});render();}});
+const intake=createIntakeUI({api,exampleMode,root,redraw:render,getDraftKey:()=>user?`${exampleMode?'example':'online'}:${user.stationId}:${user.id}`:null,onDone:async result=>{
+ const actor=user,ticket=epoch;busy=true;
+ try{const response=await api.pets();if(user!==actor||epoch!==ticket)throw Error('INTAKE_SESSION_CHANGED');
+  pets=response.pets;await go('pet',result.id,true);if(user!==actor)throw Error('INTAKE_SESSION_CHANGED');notice='已入档';
+  if(result.observationId)void api.processObservation(result.observationId).then(()=>{if(user===actor&&view==='pet'&&petId===result.id)return refreshDetail();}).catch(()=>{});
+ }finally{busy=false;render();}
+}});
 const mediaUpload=createStationMedia({api,root,redraw:render,onError:message=>{error=message;},onSaved:async()=>{pets=(await api.pets()).pets;await go('pet',petId);notice='照片与视频已保存到档案。';}});
 const station=()=>user?.role==='station';
 const owned=()=>pets.filter(p=>p.stationId===user?.stationId);
@@ -60,19 +66,19 @@ function render(){
     title=station()?'救助站工作台':'认识你的新伙伴';sub='资料与记录已连接云端';
     const list=station()?owned():pets;
     if(view==='pets')title='站内伙伴';if(view==='applications')title='领养申请';if(view==='followups')title='回访跟踪';
-    if(station()&&!list.length&&view==='home')content=`<section class="station-welcome"><div class="welcome-paw">🐾</div><h1>第一位伙伴，<br>从一张照片开始。</h1><p>拍下它，再和小助手聊聊。确认后建立档案。</p>${btn('拍下第一位伙伴','new','','button primary full')}</section>`;
+    if(station()&&!list.length&&view==='home')content=`<section class="station-welcome"><div class="welcome-paw">🐾</div><h1>认识第一位伙伴</h1>${btn('录入新伙伴','new','','button primary full')}</section>`;
     else if(view==='followups')content=followupList(followups,applications,pets);
     else if(view==='applications')content=applicationList(applications,pets);
     else if(view==='pets'||!station())content=petList(list,applications);
     else content=summary(list,applications,followups)+`<div class="section-heading"><h2>需要你看看</h2>${btn('刷新','refresh','','text-button')}</div>`+applicationList(applications,pets,{home:true});
   }else if(view==='new'){
-    title='认识一位新伙伴';sub='拍下它，再一起聊聊它';content=intake.render();
+    title='录入新伙伴';sub='';content=intake.render();
   }else if(view==='voice'){
     title=draft.replacesId?'更正这条记录':'给宠物补充';sub='按住说 → 核对文字 → 确认归档';
     content=`<label>这次说的是<select id="voice-pet" ${busy||sender.pending||draft.replacesId?'disabled':''}>${owned().map(p=>`<option value="${esc(p.id)}" ${p.id===petId?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label><div class="voice-conversation"><div class="chat-bubble">我是档案小助手。说说${esc(pet()?.name||'它')}今天的新变化，我会把转录文字放在这里，等你确认后再整理归档。</div>${draft.text?`<div class="chat-bubble">我听到的是下面这些。你可以直接修改文字，确认无误再保存。</div><label>核对转录<textarea id="observation-text" rows="4" maxlength="12000">${esc(draft.text)}</textarea></label>${btn('确认文字，归档','submit-text','','button primary full spaced')}`:`<details><summary>也可以打字告诉我</summary><textarea id="observation-text" rows="4" maxlength="12000" placeholder="记录习惯、饮食或今天的新变化"></textarea>${btn('确认文字，归档','submit-text','','button secondary full')}</details>`}${sender.pending?btn('重试本次提交','retry-submit','','button primary full'):''}${capture.media.audioUrl?`<details ${error?'open':''}><summary>回听这段录音</summary><audio controls src="${esc(capture.media.audioUrl)}"></audio>${btn('重新转录','transcribe-again','','text-button')}</details>`:''}<details><summary>资料可见范围</summary><label class="check-label"><input id="share-agent" type="checkbox" ${draft.share?'checked':''}><span>允许宠物 Agent 引用确认后的整理结果<small>关闭后仅本站可见。</small></span></label></details></div><div class="voice-composer">${exampleMode?`${btn('试一段示例口述','sample-observation','','button primary full')}<p class="online-note">示例使用预设文字，不录音、不上传。<a href="?mode=online&role=station">正式登录后使用真实语音</a></p>`:''}${!exampleMode?`<button type="button" id="hold-record" class="online-voice" ${busy||sender.pending?'disabled':''} aria-label="按住录音，松开转录">${mic}<span>按住说话</span></button><p class="online-note">松开转录 · 上滑取消 · 确认后归档</p>`:''}${busy?'<p role="status">正在保存…</p>':''}</div>`;
   }else if(view==='pet'){
     title=pet()?.name||'宠物档案';sub='档案与长期资料';
-    content=gallery(intakeDetails.visuals,pet(),ownPet())+card(`<h2>${esc(pet()?.name)}</h2><p>${esc(pet()?.profile.description||'还没有基础介绍')}</p>${ownPet()?`<div class="pet-visibility"><div><strong>向领养者公开</strong><small>${pet().published?'已公开 · 可查看档案并与分身聊天':'未公开 · 当前仅本站可见'}</small></div><button type="button" role="switch" aria-label="向领养者公开" aria-checked="${!!pet().published}" data-live="toggle-visibility" class="visibility-switch" ${busy?'disabled':''}><span></span></button></div><p class="visibility-note">仅本站可见的影像、内部记录和原始材料不会随档案公开。</p>`:''}<div class="online-actions">${ownPet()?btn('说一条新观察','voice','','button primary'):''}${btn('和它聊聊','chat')}${ownPet()?btn('分身表达','agent','','text-button'):''}</div>`)+knowledgePanel(notes,ownPet())+(ownPet()?`${intakeDetails.source_text||intakeDetails.ocr_text?`<details><summary>建档原始口述与材料 · 仅本站可见</summary><p>${esc(intakeDetails.source_text)}</p><p>${esc(intakeDetails.ocr_text)}</p></details>`:''}${recordPanel(records)}`:'');
+    content=gallery(intakeDetails.visuals,pet(),ownPet())+card(`<h2>${esc(pet()?.name)}</h2><p>${esc(pet()?.profile.description||'还没有基础介绍')}</p>${ownPet()?`<div class="pet-visibility"><div><strong>向领养者公开</strong><small>${pet().published?'已公开 · 可查看档案并与分身聊天':'未公开 · 当前仅本站可见'}</small></div><button type="button" role="switch" aria-label="向领养者公开" aria-checked="${!!pet().published}" data-live="toggle-visibility" class="visibility-switch" ${busy?'disabled':''}><span></span></button></div><p class="visibility-note">仅本站可见的影像、内部记录和原始材料不会随档案公开。</p>`:''}<div class="online-actions">${ownPet()?btn('说一条新观察','voice','','button primary'):''}${btn('和它聊聊','chat')}${ownPet()?btn('分身表达','agent','','text-button'):''}</div>`)+knowledgePanel(notes,ownPet())+(ownPet()?`${intakeDetails.source_text||intakeDetails.ocr_text?`<details><summary>建档原始口述与材料 · 仅本站可见</summary><p>${esc(intakeDetails.source_text)}</p><p>${esc(intakeDetails.ocr_text)}</p></details>`:''}${intakeDetails.documents?.length?`<div class="intake-attachments">${intakeDetails.documents.map(d=>`<a href="${esc(d.url)}" download="${esc(d.name)}" target="_blank" rel="noopener">▤ ${esc(d.name)}</a>`).join('')}</div>`:''}${recordPanel(records)}`:'');
   }else if(view==='media'){
     title='补充影像';sub=pet()?.name||'宠物长期档案';content=mediaUpload.render();
   }else if(view==='application'){
@@ -93,18 +99,18 @@ function render(){
   }
   const nav=station()&&['home','pets','applications','followups'].includes(view);
   const dock=nav&&owned().length;
-  root.innerHTML=`<div class="phone-app online-app ${view==='new'?'intake-chat-page':''} ${view==='voice'?'voice-chat-page':''} ${nav?'station-nav-page':''} ${dock?'station-dock-page':''}">${header(title,sub)}<main class="main"><div id="live-error" class="online-error" role="alert">${esc(error)}</div>${notice?`<p class="online-note" role="status">${esc(notice)}</p>`:''}${exampleMode?`<div class="station-example-bar"><span>救助站示例 · 本页独立保存</span>${btn('切换场景','scenes','','text-button')}<a href="?mode=online&role=station">正式登录</a></div>`:''}${content}${!exampleMode&&(!user||view==='home')?'<a class="station-example-link" href="?mode=online&role=station&examples=1" target="_blank" rel="noopener">先看看救助站示例 →</a>':''}</main>${dock?`<div class="station-action-dock">${btn('＋ 录入新伙伴','new','','button secondary')}${btn('＋ 补充日常','voice','','button primary')}</div>`:''}${nav?`<nav class="station-nav" aria-label="救助站导航">${[['home','⌂','工作台'],['pets','♧','宠物'],['applications','▤','申请'],['followups','◷','回访']].map(([id,icon,label])=>`<button data-live="${id}" ${view===id?'aria-current="page"':''}><span aria-hidden="true">${icon}</span>${label}</button>`).join('')}</nav>`:''}</div>`;
+  root.innerHTML=`<div class="phone-app online-app ${view==='new'?'intake-simple-page':''} ${view==='voice'?'voice-chat-page':''} ${nav?'station-nav-page':''} ${dock?'station-dock-page':''}">${header(title,sub)}<main class="main"><div id="live-error" class="online-error" role="alert">${esc(error)}</div>${notice?`<div class="intake-saved-actions"><p class="online-note" role="status">${esc(notice)}</p>${notice==='已入档'?btn('继续录入','new','','text-button'):''}</div>`:''}${exampleMode?`<div class="station-example-bar"><span>${view==='new'?'示例 · 不调用真实 AI':'救助站示例 · 本页独立保存'}</span>${btn('切换场景','scenes','','text-button')}<a href="?mode=online&role=station">正式登录</a></div>`:''}${content}${!exampleMode&&(!user||view==='home')?'<a class="station-example-link" href="?mode=online&role=station&examples=1" target="_blank" rel="noopener">先看看救助站示例 →</a>':''}</main>${dock?`<div class="station-action-dock">${btn('＋ 录入新伙伴','new','','button secondary')}${btn('＋ 补充日常','voice','','button primary')}</div>`:''}${nav?`<nav class="station-nav" aria-label="救助站导航">${[['home','⌂','工作台'],['pets','♧','宠物'],['applications','▤','申请'],['followups','◷','回访']].map(([id,icon,label])=>`<button data-live="${id}" ${view===id?'aria-current="page"':''}><span aria-hidden="true">${icon}</span>${label}</button>`).join('')}</nav>`:''}</div>`;
   bindHold();if(view==='new')intake.bind();
 }
 function date(value){return new Date(value).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});}
 function failure(e){error=errorMessage(e);if(e?.status===401&&e.message!=='INVALID_CREDENTIALS'){user=null;view='login';epoch++;clearTimeout(pollTimer);capture.emergencyStop();sender.discard();notes=[];records=[];messages=[];}showError();}
 async function resetCapture(){captureResetting=true;holding=false;await capture.reset();captureResetting=false;}
-async function go(next,id){
-  if(mediaUpload.busy)return;if(view==='new'&&intake.busy)return;if(view==='new'&&next!=='new')intake.stop();
+async function go(next,id,intakeCompleted=false){
+  if(mediaUpload.busy)return;if(view==='new'&&intake.busy&&!intakeCompleted)return;if(view==='new'&&next!=='new')intake.stop();
   clearTimeout(pollTimer);epoch++;snapshot();
   if(view==='voice'&&next!=='voice'){await resetCapture();sender.discard();}
   if(next==='voice'){petId=id||petId||owned()[0]?.id;if(!owned().some(p=>p.id===petId))petId=owned()[0]?.id;if(!petId)return;draft={text:'',share:true,replacesId:null};await resetCapture();}
-  if(next==='new')intake.reset();
+  if(next==='new')await intake.reset();
   if(id)petId=id;if(next==='pet'){notes=[];records=[];intakeDetails={};Object.assign(recordFilters,{q:'',status:'all',from:'',to:'',order:'desc',id:''});setCategory('all');}view=next;error='';notice='';messages=[];chatText='';render();root.scrollIntoView?.({block:'start'});
   if(next==='pet')await refreshDetail();
 }

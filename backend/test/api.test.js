@@ -41,6 +41,7 @@ test('intake confirms one archive, isolates original OCR and private media, and 
  const analyzed=await request(station,'POST','/v1/intake/analyze',input);assert.equal(analyzed.statusCode,200,analyzed.body);assert.equal(analyzed.json().nextQuestion,draft.nextQuestion);
  const body={name:draft.name,profile:{species:'cat',description:draft.description,age:draft.age},published:false,text:input.text,ocrText:draft.ocrText,photos:[photo]},key=randomUUID();
  const first=await request(station,'POST','/v1/intake/commit',body,{'idempotency-key':key});assert.equal(first.statusCode,201,first.body);const id=first.json().id;
+ assert.equal((await request(station,'GET',`/v1/pets/${id}`)).json().profile.photoUrl.endsWith(`/v1/pets/${id}/visual/0`),true);
  const second=await request(station,'POST','/v1/intake/commit',body,{'idempotency-key':key});assert.equal(second.json().id,id);
  assert.equal((await request(station,'POST','/v1/intake/commit',{...body,name:'另一个名字'},{'idempotency-key':key})).statusCode,409);
  assert.equal((await request(other,'GET',`/v1/pets/${id}/intake`)).statusCode,403);

@@ -5,8 +5,29 @@ import {transaction} from './db.js';
 import {assert} from './errors.js';
 import {petProfileSchema,defaultVoice} from './pet-agent.js';
 import {reserveBudget} from './onboarding.js';
-export const intakeDraftSchema=z.object({name:z.string().max(80),species:z.enum(['cat','dog','unknown']),description:z.string().max(4000),character:z.string().max(500),age:z.string().max(80),sex:z.enum(['male','female','unknown']),ocrText:z.string().max(6000),nextQuestion:z.string().max(200).default(''),uncertainties:z.array(z.string().max(160)).max(10)}).strict();
+const intakeProfileFields={name:z.string().max(80),species:z.enum(['cat','dog','unknown']),description:z.string().max(4000),character:z.string().max(500),age:z.string().max(80),sex:z.enum(['male','female','unknown'])};
+const correctionSchema=z.object({field:z.enum(Object.keys(intakeProfileFields)),quote:z.string().max(4000)}).strict();
+const confirmedFieldsSchema=z.object(intakeProfileFields).partial().strict();
+export const intakeDraftSchema=z.object({...intakeProfileFields,ocrText:z.string().max(6000),nextQuestion:z.string().max(200).default(''),uncertainties:z.array(z.string().max(160)).max(10),corrections:z.array(correctionSchema).max(6).default([])}).strict();
+export function validateIntakeDraft(value,{confirmedFields={},latestText=''}={}){
+ const confirmed=confirmedFieldsSchema.parse(confirmedFields),draft=intakeDraftSchema.parse({...value,corrections:[]}),corrected=new Set();
+ for(const item of Array.isArray(value?.corrections)?value.corrections:[]){
+  const parsed=correctionSchema.safeParse(item);if(!parsed.success)continue;
+  const {field,quote}=parsed.data;
+  if(!Object.hasOwn(confirmed,field)||!quote.trim()||!latestText.includes(quote)||corrected.has(field))continue;
+  corrected.add(field);draft.corrections.push({field,quote});
+ }
+ for(const [field,manualValue]of Object.entries(confirmed))if(!corrected.has(field))draft[field]=manualValue;
+ return draft;
+}
 const image=z.string().max(1800000).regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/);
+const document=z.object({name:z.string().trim().min(1).max(160).regex(/^[^\u0000-\u001f\u007f]+$/),dataUrl:z.string().max(7000000)}).strict();
+function decodeDocument(value){
+ const match=value.dataUrl.match(/^data:(image\/(?:jpeg|png|webp)|application\/pdf);base64,([A-Za-z0-9+/]+={0,2})$/);assert(match,400,'INVALID_DOCUMENT');
+ const bytes=Buffer.from(match[2],'base64'),mime=match[1];assert(bytes.length>12&&bytes.length<=5*1024*1024,400,'INVALID_DOCUMENT');
+ const valid=mime==='image/jpeg'?bytes[0]===255&&bytes[1]===216:mime==='image/png'?bytes.subarray(0,8).toString('hex')==='89504e470d0a1a0a':mime==='image/webp'?bytes.subarray(0,4).toString()==='RIFF'&&bytes.subarray(8,12).toString()==='WEBP':bytes.subarray(0,5).toString()==='%PDF-';
+ assert(valid,400,'INVALID_DOCUMENT');return {name:value.name,bytes,mime};
+}
 function decode(value,video=false){
  const match=value.match(video?/^data:(video\/(?:mp4|webm));base64,([A-Za-z0-9+/=]+)$/:/^data:(image\/jpeg);base64,([A-Za-z0-9+/=]+)$/);assert(match,400,'INVALID_MEDIA');
  const bytes=Buffer.from(match[2],'base64');assert(bytes.length>12&&bytes.length<=(video?10*1024*1024:1300000),400,'INVALID_MEDIA');
@@ -15,24 +36,29 @@ function decode(value,video=false){
 export async function intakeRoutes(app,{db,ai,storage,origin}){
  const staff=async req=>{req.user=await authenticate(db,req);assert(req.user.role==='station',403,'STATION_REQUIRED');};
  app.post('/v1/intake/analyze',{preHandler:staff,bodyLimit:8*1024*1024,config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async req=>{
-  const body=z.object({text:z.string().trim().max(12000),images:z.array(z.object({kind:z.enum(['photo','video','document']),dataUrl:image}).strict()).max(5)}).strict().parse(req.body);
+  const body=z.object({text:z.string().trim().max(12000),images:z.array(z.object({kind:z.enum(['photo','video','document']),dataUrl:image}).strict()).max(5),confirmedFields:confirmedFieldsSchema.optional(),latestText:z.string().max(4000).optional()}).strict().parse(req.body);
+  assert(body.text.length+(body.latestText?.length||0)+Object.values(body.confirmedFields||{}).reduce((length,value)=>length+value.length,0)<=20000,400,'INVALID_INPUT');
   assert(body.text||body.images.length,400,'EMPTY_INTAKE');body.images.forEach(i=>decode(i.dataUrl));await reserveBudget(db,'intake',10,200);
-  return intakeDraftSchema.parse(await ai.draftIntake(body));
+  return validateIntakeDraft(await ai.draftIntake(body),body);
  });
  app.post('/v1/intake/commit',{preHandler:staff,bodyLimit:20*1024*1024},async(req,reply)=>{
-  const body=z.object({name:z.string().trim().min(1).max(80),profile:petProfileSchema,published:z.boolean(),text:z.string().max(12000),ocrText:z.string().max(6000),photos:z.array(image).min(1).max(3),video:z.string().max(14500000).optional()}).strict().parse(req.body);
+  const body=z.object({name:z.string().trim().min(1).max(80),profile:petProfileSchema,published:z.boolean(),text:z.string().max(12000),ocrText:z.string().max(6000),photos:z.array(image).max(3),video:z.string().max(14500000).optional(),documents:z.array(document).max(3).optional(),simple:z.boolean().optional()}).strict().parse(req.body);
+  assert(!body.simple||body.text.length<=4000,400,'INVALID_INPUT');
   const key=z.string().uuid().parse(req.headers['idempotency-key']),hash=digest(JSON.stringify(body));
   const media=body.photos.map(v=>decode(v));if(body.video)media.push(decode(body.video,true));
+  const documents=(body.documents||[]).map(decodeDocument),description=body.simple?body.text:body.profile.description;
+  assert(media.length||documents.length||description.trim(),400,'EMPTY_INTAKE');
   const result=await transaction(db,async client=>{
    await client.query('SELECT pg_advisory_xact_lock(73021500)');
    const prior=(await client.query('SELECT * FROM pet_intakes WHERE id=$1',[key])).rows[0];
    if(prior){assert(prior.author_id===req.user.id&&prior.request_hash===hash,409,'INTAKE_CONFLICT');return {id:prior.pet_id,observationId:prior.observation_id};}
    const id=randomUUID(),objects=[];
    try{
-    const profile={...body.profile,photoUrl:`${origin}/v1/pets/${id}/visual/0`};
+    const profile={...body.profile,description,photoUrl:body.photos.length?`${origin}/v1/pets/${id}/visual/0`:''};
     await client.query('INSERT INTO pets(id,station_id,name,profile,published) VALUES($1,$2,$3,$4,$5)',[id,req.user.station_id,body.name,JSON.stringify(profile),body.published]);
     await client.query('INSERT INTO pet_agents(pet_id,voice) VALUES($1,$2)',[id,JSON.stringify(defaultVoice(profile))]);
     for(let i=0;i<media.length;i++){const m=media[i],object=`pets/${id}/visual/${i}`;await storage.put(object,m.bytes,m.mime);objects.push(object);await client.query('INSERT INTO media(id,pet_id,owner_id,object_name,mime,size) VALUES($1,$2,$3,$4,$5,$6)',[randomUUID(),id,req.user.id,object,m.mime,m.bytes.length]);}
+    for(let i=0;i<documents.length;i++){const d=documents[i],object=`pets/${id}/document/${i}`;await storage.put(object,d.bytes,d.mime);objects.push(object);await client.query('INSERT INTO media(id,pet_id,owner_id,object_name,mime,size,caption,shared) VALUES($1,$2,$3,$4,$5,$6,$7,false)',[randomUUID(),id,req.user.id,object,d.mime,d.bytes.length,d.name]);}
     let observationId=null;
     if(profile.description.trim()){observationId=randomUUID();await client.query("INSERT INTO observations(id,pet_id,author_id,idempotency_key,request_hash,original_text,share_with_agent) VALUES($1,$2,$3,$4,$5,$6,true)",[observationId,id,req.user.id,key,digest(profile.description),profile.description]);}
     await client.query('INSERT INTO pet_intakes(id,author_id,pet_id,request_hash,source_text,ocr_text,observation_id) VALUES($1,$2,$3,$4,$5,$6,$7)',[key,req.user.id,id,hash,body.text,body.ocrText,observationId]);
@@ -45,7 +71,15 @@ export async function intakeRoutes(app,{db,ai,storage,origin}){
   const p=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];assert(p&&p.station_id===req.user.station_id,403,'STATION_REQUIRED');
   const source=(await db.query('SELECT source_text,ocr_text FROM pet_intakes WHERE pet_id=$1',[p.id])).rows[0]||{};
   const visuals=(await db.query('SELECT object_name,mime,caption,shared,created_at FROM media WHERE pet_id=$1 AND object_name LIKE $2 ORDER BY created_at DESC,object_name',[p.id,`pets/${p.id}/visual/%`])).rows.map(m=>({url:`${origin}/v1/pets/${p.id}/visual/${m.object_name.split('/').pop()}`,mime:m.mime,caption:m.caption,shared:m.shared,createdAt:m.created_at}));
-  return {...source,visuals};
+  const documents=(await db.query('SELECT object_name,mime,size,caption,created_at FROM media WHERE pet_id=$1 AND object_name LIKE $2 ORDER BY object_name',[p.id,`pets/${p.id}/document/%`])).rows.map(m=>({url:`${origin}/v1/pets/${p.id}/document/${m.object_name.split('/').pop()}`,name:m.caption,mime:m.mime,size:m.size,createdAt:m.created_at}));
+  return {...source,visuals,documents};
+ });
+ app.get('/v1/pets/:id/document/:slot',{preHandler:staff},async(req,reply)=>{
+  assert(/^[0-2]$/.test(req.params.slot),404,'MEDIA_NOT_FOUND');
+  const p=(await db.query('SELECT * FROM pets WHERE id=$1',[req.params.id])).rows[0];assert(p&&p.station_id===req.user.station_id,403,'STATION_REQUIRED');
+  const d=(await db.query('SELECT * FROM media WHERE pet_id=$1 AND object_name=$2',[p.id,`pets/${p.id}/document/${req.params.slot}`])).rows[0];assert(d,404,'MEDIA_NOT_FOUND');
+  const filename=encodeURIComponent(d.caption).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
+  return reply.header('Cache-Control','private, no-store').header('Content-Disposition',`attachment; filename="document"; filename*=UTF-8''${filename}`).type(d.mime).send(await storage.read(d.object_name));
  });
  app.post('/v1/pets/:id/visuals',{preHandler:staff,bodyLimit:20*1024*1024},async(req,reply)=>{
   const body=z.object({photos:z.array(image).max(3),video:z.string().max(14500000).optional(),caption:z.string().trim().max(1000).default(''),shared:z.boolean().default(false)}).strict().parse(req.body),key=z.uuid().parse(req.headers['idempotency-key']),hash=digest(JSON.stringify(body));
